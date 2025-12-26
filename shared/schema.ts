@@ -24,6 +24,7 @@ export const gameSessions = pgTable("game_sessions", {
   enemyHp: integer("enemy_hp").notNull().default(100),
   maxEnemyHp: integer("max_enemy_hp").notNull().default(100),
   enemyDamage: integer("enemy_damage").notNull().default(10),
+  pendingGoldReward: integer("pending_gold_reward").notNull().default(0),
   rerollsLeft: integer("rerolls_left").notNull().default(3),
   
   // 주사위 상태 (JSON 배열)

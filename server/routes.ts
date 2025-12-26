@@ -5,6 +5,41 @@ import { insertGameSessionSchema, updateGameSessionSchema, type Dice } from "@sh
 
 const FIXED_SUITS = ['None', '♠', '♦', '♥', '♣'];
 
+// 스테이지별 적 HP와 골드 보상 계산
+function getStageStats(stage: number, difficulty: string) {
+  const baseHp = 100;
+  const baseReward = 3;
+  const stageMultiplier = 1 + (stage - 1) * 0.5; // 스테이지마다 50% 증가
+  
+  let difficultyMultiplier = 1;
+  let rewardMultiplier = 1;
+  
+  switch (difficulty) {
+    case 'easy':
+      difficultyMultiplier = 1;
+      rewardMultiplier = 1;
+      break;
+    case 'medium':
+      difficultyMultiplier = 1.5;
+      rewardMultiplier = 1.5;
+      break;
+    case 'hard':
+      difficultyMultiplier = 2;
+      rewardMultiplier = 2;
+      break;
+    case 'boss':
+      difficultyMultiplier = 3;
+      rewardMultiplier = 4;
+      break;
+  }
+  
+  return {
+    enemyHp: Math.round(baseHp * stageMultiplier * difficultyMultiplier),
+    goldReward: Math.round(baseReward * stageMultiplier * rewardMultiplier),
+    enemyDamage: Math.round(10 + (stage - 1) * 2), // 스테이지마다 데미지 증가
+  };
+}
+
 function createInitialDices(): Dice[] {
   return Array.from({ length: 5 }, (_, i) => ({
     id: i,
@@ -30,10 +65,11 @@ export async function registerRoutes(
         score: 0,
         currentStage: 1,
         currentRound: 1,
-        gameState: 'combat',
+        gameState: 'stage_select',
         enemyHp: 100,
         maxEnemyHp: 100,
         enemyDamage: 10,
+        pendingGoldReward: 0,
         rerollsLeft: 3,
         dices: initialDices as any,
         jokers: [],
@@ -132,19 +168,27 @@ export async function registerRoutes(
       const newDices = createInitialDices();
       
       let newGameState = 'combat';
+      let goldReward = 0;
+      let newStage = session.currentStage;
+      
       if (newPlayerHp === 0) {
         newGameState = 'game_over';
       } else if (newEnemyHp === 0) {
         newGameState = 'shop';
+        goldReward = session.pendingGoldReward || 0;
+        newStage = session.currentStage + 1; // 스테이지 클리어 시 다음 스테이지로
       }
 
       const updatedSession = await storage.updateGameSession(req.params.id, {
         enemyHp: newEnemyHp,
         health: newPlayerHp,
+        gold: session.gold + goldReward,
         score: session.score + damage,
+        currentStage: newStage,
         dices: newDices as any,
         rerollsLeft: 3,
         gameState: newGameState,
+        pendingGoldReward: 0,
       });
 
       res.json(updatedSession);
@@ -163,29 +207,24 @@ export async function registerRoutes(
         return res.status(404).json({ error: 'Game session not found' });
       }
 
-      let newEnemyHp = 800;
+      const stageStats = getStageStats(session.currentStage, stageChoice);
       let newRound = session.currentRound;
       let newStage = session.currentStage;
 
       if (stageChoice === 'boss') {
-        newEnemyHp = 2000;
         newRound += 1;
-      } else if (stageChoice === 'hard') {
-        newEnemyHp = 1200;
-      } else if (stageChoice === 'medium') {
-        newEnemyHp = 1000;
-      } else {
-        newEnemyHp = 800;
       }
 
       const updatedSession = await storage.updateGameSession(req.params.id, {
         gameState: 'combat',
-        enemyHp: newEnemyHp,
-        maxEnemyHp: newEnemyHp,
+        enemyHp: stageStats.enemyHp,
+        maxEnemyHp: stageStats.enemyHp,
+        enemyDamage: stageStats.enemyDamage,
+        pendingGoldReward: stageStats.goldReward,
         currentRound: newRound,
         currentStage: newStage,
         rerollsLeft: 3,
-        dices: createInitialDices() as any,
+        dices: [] as any,
       });
 
       res.json(updatedSession);
