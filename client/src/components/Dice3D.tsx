@@ -212,8 +212,7 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
 }
 
 function getTopFaceValue(mesh: THREE.Mesh): number {
-  const rotation = mesh.rotation;
-  const matrix = new THREE.Matrix4().makeRotationFromEuler(rotation);
+  const quaternion = mesh.getWorldQuaternion(new THREE.Quaternion());
   
   const faces = [
     { normal: new THREE.Vector3(1, 0, 0), value: 2 },
@@ -229,7 +228,7 @@ function getTopFaceValue(mesh: THREE.Mesh): number {
   let topValue = 1;
   
   for (const face of faces) {
-    const rotatedNormal = face.normal.clone().applyMatrix4(matrix);
+    const rotatedNormal = face.normal.clone().applyQuaternion(quaternion);
     const dot = rotatedNormal.dot(up);
     
     if (dot > maxDot) {
