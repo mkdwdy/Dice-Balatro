@@ -219,6 +219,15 @@ export default function GameScreen() {
     }));
   };
 
+  const handleValueSettled = useCallback((id: number, value: number) => {
+    setDices(prevDices => prevDices.map(d => {
+      if (d.id === id && !d.locked) {
+        return { ...d, value };
+      }
+      return d;
+    }));
+  }, []);
+
   const startCharging = useCallback(() => {
     if (!game || game.rerollsLeft <= 0 || rolling) return;
     
@@ -391,7 +400,7 @@ export default function GameScreen() {
 
         {/* Center - 3D Dice Board */}
         <div className="lg:col-span-3 relative min-h-0">
-          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} power={rollPower} />
+          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} power={rollPower} onValueSettled={handleValueSettled} />
           
           {damageDealt && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none animate-in fade-in duration-300">

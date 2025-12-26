@@ -57,6 +57,7 @@ interface DiceProps {
   onLockToggle: (id: number, detectedValue: number) => void;
   rolling: boolean;
   power: number;
+  onValueSettled?: (id: number, value: number) => void;
 }
 
 const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
@@ -68,8 +69,11 @@ const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
   6: [Math.PI / 2, 0, 0],
 };
 
-function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power }: DiceProps) {
+function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power, onValueSettled }: DiceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const wasRollingRef = useRef(false);
+  const settledFramesRef = useRef(0);
+  const hasReportedValueRef = useRef(false);
   
   const initialRotation: [number, number, number] = VALUE_TO_ROTATION[value] || [0, 0, 0];
   
@@ -81,6 +85,22 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
     material: { friction: 0.1, restitution: 0.6 },
     type: isLocked ? 'Static' : 'Dynamic',
   }));
+
+  const velocityRef = useRef([0, 0, 0]);
+  const angularVelocityRef = useRef([0, 0, 0]);
+
+  useEffect(() => {
+    const unsubVel = api.velocity.subscribe((v) => {
+      velocityRef.current = v;
+    });
+    const unsubAngVel = api.angularVelocity.subscribe((v) => {
+      angularVelocityRef.current = v;
+    });
+    return () => {
+      unsubVel();
+      unsubAngVel();
+    };
+  }, [api]);
 
   const textures = useMemo(() => {
     return [
@@ -103,12 +123,18 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
   }, [textures, isLocked]);
 
   useEffect(() => {
-    const rotation = VALUE_TO_ROTATION[value] || [0, 0, 0];
-    api.rotation.set(rotation[0], rotation[1], rotation[2]);
-  }, [value, api]);
+    if (isLocked) {
+      const rotation = VALUE_TO_ROTATION[value] || [0, 0, 0];
+      api.rotation.set(rotation[0], rotation[1], rotation[2]);
+    }
+  }, [value, api, isLocked]);
 
   useEffect(() => {
     if (rolling && !isLocked) {
+      wasRollingRef.current = true;
+      hasReportedValueRef.current = false;
+      settledFramesRef.current = 0;
+      
       const powerMultiplier = 0.5 + power * 1.5;
       
       api.velocity.set(0, 5 * powerMultiplier, 0);
@@ -134,6 +160,29 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
     if (isLocked) {
       api.velocity.set(0, 0, 0);
       api.angularVelocity.set(0, 0, 0);
+      return;
+    }
+
+    if (!rolling && wasRollingRef.current && !hasReportedValueRef.current) {
+      const vel = velocityRef.current;
+      const angVel = angularVelocityRef.current;
+      const speed = Math.sqrt(vel[0] ** 2 + vel[1] ** 2 + vel[2] ** 2);
+      const angSpeed = Math.sqrt(angVel[0] ** 2 + angVel[1] ** 2 + angVel[2] ** 2);
+
+      if (speed < 0.1 && angSpeed < 0.1) {
+        settledFramesRef.current++;
+        if (settledFramesRef.current > 10) {
+          const mesh = meshRef.current;
+          if (mesh && onValueSettled) {
+            const topValue = getTopFaceValue(mesh);
+            onValueSettled(id, topValue);
+            hasReportedValueRef.current = true;
+            wasRollingRef.current = false;
+          }
+        }
+      } else {
+        settledFramesRef.current = 0;
+      }
     }
   });
 
@@ -285,9 +334,10 @@ interface DiceBoardProps {
   onLockToggle: (id: number, detectedValue: number) => void;
   rolling: boolean;
   power?: number;
+  onValueSettled?: (id: number, value: number) => void;
 }
 
-function DiceScene({ dices, onLockToggle, rolling, power = 1 }: DiceBoardProps) {
+function DiceScene({ dices, onLockToggle, rolling, power = 1, onValueSettled }: DiceBoardProps) {
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 25, 1]} fov={35} onUpdate={c => c.lookAt(0, 0, 0)} />
@@ -325,6 +375,7 @@ function DiceScene({ dices, onLockToggle, rolling, power = 1 }: DiceBoardProps) 
             onLockToggle={onLockToggle}
             rolling={rolling}
             power={power}
+            onValueSettled={onValueSettled}
           />
         ))}
       </Physics>
@@ -332,7 +383,7 @@ function DiceScene({ dices, onLockToggle, rolling, power = 1 }: DiceBoardProps) 
   );
 }
 
-export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: DiceBoardProps) {
+export default function DiceBoard({ dices, onLockToggle, rolling, power = 1, onValueSettled }: DiceBoardProps) {
   return (
     <div className="w-full h-full rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/80 relative">
       <Canvas shadows dpr={[1, 2]}>
@@ -341,6 +392,7 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: D
           onLockToggle={onLockToggle} 
           rolling={rolling} 
           power={power}
+          onValueSettled={onValueSettled}
         />
       </Canvas>
       
