@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Physics, useBox, usePlane } from '@react-three/cannon';
-import { Text, PerspectiveCamera } from '@react-three/drei';
+import { Text, PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 // 색상 정의
@@ -81,16 +81,18 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling }: DicePr
       // 랜덤한 힘과 회전 가하기
       api.velocity.set(0, 5, 0);
       api.angularVelocity.set(
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 10
+        (Math.random() - 0.5) * 15,
+        (Math.random() - 0.5) * 15,
+        (Math.random() - 0.5) * 15
       );
       
-      // 약간 위로 튀어오르게
+      // 위로 튀어오르게
       api.applyImpulse(
-        [(Math.random() - 0.5) * 5, 5 + Math.random() * 5, (Math.random() - 0.5) * 5],
+        [(Math.random() - 0.5) * 10, 10 + Math.random() * 5, (Math.random() - 0.5) * 10],
         [0, 0, 0]
       );
+      // 잠자기 상태 깨우기
+      api.wakeUp();
     }
   }, [rolling, isLocked, api]);
 
@@ -100,8 +102,9 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling }: DicePr
       // 락인되면 위치 고정 및 회전 멈춤
       api.velocity.set(0, 0, 0);
       api.angularVelocity.set(0, 0, 0);
-      api.rotation.set(0, 0, 0); // 정면을 보게 리셋 (임시)
-      // 실제로는 현재 숫자가 위로 오게 회전해야 함
+      
+      // 현재 회전 상태를 유지하되 정지 (원한다면 특정 면이 위로 오게 할 수도 있음)
+      // 지금은 단순히 물리적 움직임만 정지
     }
   });
 
@@ -116,7 +119,6 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling }: DicePr
       receiveShadow
     >
       <boxGeometry args={[1, 1, 1]} />
-      {/* 6면 텍스처 매핑 - 일단은 모두 같은 숫자로 (나중에 면마다 다르게 할 수 있음) */}
       <meshStandardMaterial map={texture} color={isLocked ? '#ffff00' : '#ffffff'} />
       {isLocked && (
         <mesh position={[0, 1.2, 0]}>
@@ -137,7 +139,8 @@ function Plane() {
   return (
     <mesh ref={ref as any} receiveShadow>
       <planeGeometry args={[100, 100]} />
-      <meshStandardMaterial color="#0f172a" />
+      {/* 바닥 색상을 좀 더 밝게 하여 시인성 확보 */}
+      <meshStandardMaterial color="#1e293b" />
     </mesh>
   );
 }
@@ -159,23 +162,31 @@ interface DiceBoardProps {
 
 export default function DiceBoard({ dices, onLockToggle, rolling }: DiceBoardProps) {
   return (
-    <div className="w-full h-[400px] rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/50">
+    <div className="w-full h-[400px] rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/80 relative">
       <Canvas shadows dpr={[1, 2]}>
-        <PerspectiveCamera makeDefault position={[0, 20, 10]} fov={40} />
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 20, 10]} intensity={1} castShadow />
-        <Physics gravity={[0, -20, 0]}>
+        {/* 카메라 위치: 위에서 아래로 직각으로 내려다봄 */}
+        <PerspectiveCamera makeDefault position={[0, 25, 1]} fov={35} onUpdate={c => c.lookAt(0, 0, 0)} />
+        
+        {/* 사용자 조작 가능 (디버깅 및 편의성) */}
+        <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={0} maxPolarAngle={Math.PI / 2.5} />
+
+        <ambientLight intensity={1.5} />
+        <pointLight position={[10, 20, 10]} intensity={2} castShadow />
+        <directionalLight position={[0, 20, 0]} intensity={1.5} castShadow />
+
+        <Physics gravity={[0, -30, 0]}>
           <Plane />
-          {/* Walls to keep dice inside - 더 넓게 조정 */}
-          <Wall position={[0, 0, -8]} args={[20, 10, 1]} /> {/* Back */}
-          <Wall position={[0, 0, 8]} args={[20, 10, 1]} />  {/* Front */}
-          <Wall position={[-10, 0, 0]} args={[1, 10, 16]} /> {/* Left */}
-          <Wall position={[10, 0, 0]} args={[1, 10, 16]} />  {/* Right */}
+          {/* Walls - 넓은 박스 형태 */}
+          <Wall position={[0, 0, -10]} args={[22, 10, 1]} /> {/* Back */}
+          <Wall position={[0, 0, 10]} args={[22, 10, 1]} />  {/* Front */}
+          <Wall position={[-11, 0, 0]} args={[1, 10, 22]} /> {/* Left */}
+          <Wall position={[11, 0, 0]} args={[1, 10, 22]} />  {/* Right */}
 
           {dices.map((dice, i) => (
             <Dice
               key={dice.id}
-              position={[(i - 2) * 2.5, 5, 0]} // 공중에서 시작해서 떨어지게
+              // 초기 위치: 중앙에 모여서 떨어짐
+              position={[(i - 2) * 1.5, 5 + i, 0]} 
               value={dice.value}
               suit={dice.suit}
               isLocked={dice.locked}
@@ -185,6 +196,11 @@ export default function DiceBoard({ dices, onLockToggle, rolling }: DiceBoardPro
           ))}
         </Physics>
       </Canvas>
+      
+      {/* 3D 뷰포트 안내 텍스트 */}
+      <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground pointer-events-none">
+        Drag to rotate view
+      </div>
     </div>
   );
 }
