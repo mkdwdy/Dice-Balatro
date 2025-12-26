@@ -432,27 +432,6 @@ export default function GameScreen() {
             </div>
           </div>
 
-          {/* Locked Dices */}
-          <div className="md:col-span-2">
-            <div className="flex gap-2 justify-center md:justify-start">
-              {dices.map(dice => (
-                <div
-                  key={dice.id}
-                  onClick={() => toggleLock(dice.id, dice.value)}
-                  data-testid={`dice-2d-${dice.id}`}
-                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all ${
-                    dice.locked
-                      ? 'bg-primary text-primary-foreground border-primary shadow-[0_0_10px_rgba(255,165,0,0.5)] scale-105'
-                      : 'bg-card text-muted-foreground border-card-border opacity-50 hover:opacity-100'
-                  }`}
-                >
-                  <span className="text-lg font-bold">{dice.value}</span>
-                  <span className="text-[10px]">{dice.suit}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Hand Info & Actions */}
           <div className="flex gap-2 items-center justify-center md:justify-end">
             {selectedHand && (
