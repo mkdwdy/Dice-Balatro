@@ -6,18 +6,18 @@ import * as THREE from 'three';
 
 const SUIT_COLORS: Record<string, string> = {
   'None': '#ffffff',
-  '♠': '#1a1a1a',
-  '♦': '#e11d48',
-  '♥': '#e11d48',
-  '♣': '#1a1a1a',
-};
-
-const SUIT_TEXT_COLORS: Record<string, string> = {
-  'None': '#000000',
   '♠': '#ffffff',
   '♦': '#ffffff',
   '♥': '#ffffff',
   '♣': '#ffffff',
+};
+
+const SUIT_TEXT_COLORS: Record<string, string> = {
+  'None': '#000000',
+  '♠': '#1a1a1a',
+  '♦': '#f97316',
+  '♥': '#dc2626',
+  '♣': '#1e3a5f',
 };
 
 const PIP_POSITIONS: Record<number, [number, number][]> = {
