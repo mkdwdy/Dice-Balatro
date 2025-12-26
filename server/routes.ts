@@ -169,14 +169,12 @@ export async function registerRoutes(
       
       let newGameState = 'combat';
       let goldReward = 0;
-      let newStage = session.currentStage;
       
       if (newPlayerHp === 0) {
         newGameState = 'game_over';
       } else if (newEnemyHp === 0) {
         newGameState = 'shop';
         goldReward = session.pendingGoldReward || 0;
-        newStage = session.currentStage + 1; // 스테이지 클리어 시 다음 스테이지로
       }
 
       const updatedSession = await storage.updateGameSession(req.params.id, {
@@ -184,7 +182,6 @@ export async function registerRoutes(
         health: newPlayerHp,
         gold: session.gold + goldReward,
         score: session.score + damage,
-        currentStage: newStage,
         dices: newDices as any,
         rerollsLeft: 3,
         gameState: newGameState,
@@ -207,9 +204,10 @@ export async function registerRoutes(
         return res.status(404).json({ error: 'Game session not found' });
       }
 
-      const stageStats = getStageStats(session.currentStage, stageChoice);
+      // 다음 스테이지 번호 계산 (현재 스테이지 + 1)
+      const nextStage = session.currentStage + 1;
+      const stageStats = getStageStats(nextStage, stageChoice);
       let newRound = session.currentRound;
-      let newStage = session.currentStage;
 
       if (stageChoice === 'boss') {
         newRound += 1;
@@ -222,7 +220,7 @@ export async function registerRoutes(
         enemyDamage: stageStats.enemyDamage,
         pendingGoldReward: stageStats.goldReward,
         currentRound: newRound,
-        currentStage: newStage,
+        currentStage: nextStage,
         rerollsLeft: 3,
         dices: [] as any,
       });

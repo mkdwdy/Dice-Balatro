@@ -1,14 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { Swords, Target, Skull, Crown, HeartIcon } from 'lucide-react';
 import type { GameSession } from '@shared/schema';
 
-const STAGE_OPTIONS = [
+// 스테이지별 스탯 계산 (서버와 동일한 로직)
+function getStageStats(stage: number, difficulty: string) {
+  const baseHp = 100;
+  const baseReward = 3;
+  const stageMultiplier = 1 + (stage - 1) * 0.5;
+  
+  let difficultyMultiplier = 1;
+  let rewardMultiplier = 1;
+  
+  switch (difficulty) {
+    case 'easy':
+      difficultyMultiplier = 1;
+      rewardMultiplier = 1;
+      break;
+    case 'medium':
+      difficultyMultiplier = 1.5;
+      rewardMultiplier = 1.5;
+      break;
+    case 'hard':
+      difficultyMultiplier = 2;
+      rewardMultiplier = 2;
+      break;
+    case 'boss':
+      difficultyMultiplier = 3;
+      rewardMultiplier = 4;
+      break;
+  }
+  
+  return {
+    enemyHp: Math.round(baseHp * stageMultiplier * difficultyMultiplier),
+    goldReward: Math.round(baseReward * stageMultiplier * rewardMultiplier),
+  };
+}
+
+const STAGE_DIFFICULTIES = [
   { 
     id: 'easy', 
     name: 'Easy', 
-    enemyHp: 800, 
-    reward: 3,
     icon: Target,
     color: 'text-green-500',
     description: 'Low HP enemy',
@@ -16,8 +48,6 @@ const STAGE_OPTIONS = [
   { 
     id: 'medium', 
     name: 'Medium', 
-    enemyHp: 1000, 
-    reward: 5,
     icon: Swords,
     color: 'text-yellow-500',
     description: 'Medium HP enemy',
@@ -25,8 +55,6 @@ const STAGE_OPTIONS = [
   { 
     id: 'hard', 
     name: 'Hard', 
-    enemyHp: 1200, 
-    reward: 8,
     icon: Skull,
     color: 'text-red-500',
     description: 'High HP enemy',
@@ -34,8 +62,6 @@ const STAGE_OPTIONS = [
   { 
     id: 'boss', 
     name: 'BOSS', 
-    enemyHp: 2000, 
-    reward: 15,
     icon: Crown,
     color: 'text-purple-500',
     description: 'Advance round',
@@ -108,7 +134,7 @@ export default function StageSelectPage() {
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-3xl sm:text-4xl font-black text-primary mb-2">SELECT BATTLE</h1>
-          <p className="text-lg text-muted-foreground">Stage {game.currentStage}-{game.currentRound}</p>
+          <p className="text-lg text-muted-foreground">Select Stage {game.currentStage + 1}</p>
           <div className="flex items-center justify-center gap-6 mt-3">
             <div className="flex items-center gap-2">
               <HeartIcon className="w-4 h-4 text-destructive" />
@@ -123,8 +149,9 @@ export default function StageSelectPage() {
 
         {/* Stage Options */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {STAGE_OPTIONS.map((stage) => {
+          {STAGE_DIFFICULTIES.map((stage) => {
             const Icon = stage.icon;
+            const stats = getStageStats(game.currentStage + 1, stage.id);
             return (
               <button
                 key={stage.id}
@@ -141,11 +168,11 @@ export default function StageSelectPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
                     <span className="text-xs text-muted-foreground">HP:</span>
-                    <span className="text-sm font-black text-accent">{stage.enemyHp}</span>
+                    <span className="text-sm font-black text-accent">{stats.enemyHp}</span>
                   </div>
                   <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
                     <span className="text-xs text-muted-foreground">Reward:</span>
-                    <span className="text-sm font-black text-primary">+${stage.reward}</span>
+                    <span className="text-sm font-black text-primary">+${stats.goldReward}</span>
                   </div>
                 </div>
               </button>
