@@ -75,7 +75,6 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling }: DicePr
 
   const texture = useMemo(() => createDiceFaceTexture(value, suit), [value, suit]);
 
-
   // 굴리기 로직
   useEffect(() => {
     if (rolling && !isLocked) {
@@ -132,13 +131,13 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling }: DicePr
 function Plane() {
   const [ref] = usePlane(() => ({
     rotation: [-Math.PI / 2, 0, 0],
-    position: [0, -2, 0],
+    position: [0, 0, 0],
     material: { friction: 0.1 }
   }));
   return (
     <mesh ref={ref as any} receiveShadow>
       <planeGeometry args={[100, 100]} />
-      <meshStandardMaterial color="#1a1a1a" />
+      <meshStandardMaterial color="#0f172a" />
     </mesh>
   );
 }
@@ -161,22 +160,22 @@ interface DiceBoardProps {
 export default function DiceBoard({ dices, onLockToggle, rolling }: DiceBoardProps) {
   return (
     <div className="w-full h-[400px] rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/50">
-      <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[0, 10, 10]} fov={50} />
+      <Canvas shadows dpr={[1, 2]}>
+        <PerspectiveCamera makeDefault position={[0, 20, 10]} fov={40} />
         <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} intensity={1} castShadow />
-        <Physics gravity={[0, -10, 0]}>
+        <pointLight position={[10, 20, 10]} intensity={1} castShadow />
+        <Physics gravity={[0, -20, 0]}>
           <Plane />
-          {/* Walls to keep dice inside */}
-          <Wall position={[0, 0, -6]} args={[12, 10, 1]} />
-          <Wall position={[0, 0, 6]} args={[12, 10, 1]} />
-          <Wall position={[-6, 0, 0]} args={[1, 10, 12]} />
-          <Wall position={[6, 0, 0]} args={[1, 10, 12]} />
+          {/* Walls to keep dice inside - 더 넓게 조정 */}
+          <Wall position={[0, 0, -8]} args={[20, 10, 1]} /> {/* Back */}
+          <Wall position={[0, 0, 8]} args={[20, 10, 1]} />  {/* Front */}
+          <Wall position={[-10, 0, 0]} args={[1, 10, 16]} /> {/* Left */}
+          <Wall position={[10, 0, 0]} args={[1, 10, 16]} />  {/* Right */}
 
           {dices.map((dice, i) => (
             <Dice
               key={dice.id}
-              position={[(i - 2) * 1.5, 0, 0]} // 초기 위치 분산
+              position={[(i - 2) * 2.5, 5, 0]} // 공중에서 시작해서 떨어지게
               value={dice.value}
               suit={dice.suit}
               isLocked={dice.locked}
