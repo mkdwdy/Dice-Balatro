@@ -137,12 +137,25 @@ function Plane() {
 }
 
 function Wall({ position, args }: { position: [number, number, number], args: [number, number, number] }) {
-  const [ref] = useBox(() => ({ position, args }));
+  const [ref] = useBox(() => ({ 
+    position, 
+    args,
+    material: { restitution: 0.8 }
+  }));
   return (
     <mesh ref={ref as any} visible={false}>
       <boxGeometry args={args} />
     </mesh>
   );
+}
+
+function Ceiling() {
+  const [ref] = usePlane(() => ({
+    rotation: [Math.PI / 2, 0, 0],
+    position: [0, 25, 0],
+    material: { restitution: 0.9 }
+  }));
+  return <mesh ref={ref as any} visible={false} />;
 }
 
 interface DiceBoardProps {
@@ -166,10 +179,11 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: D
 
         <Physics gravity={[0, -30, 0]}>
           <Plane />
-          <Wall position={[0, 0, -10]} args={[22, 10, 1]} />
-          <Wall position={[0, 0, 10]} args={[22, 10, 1]} />
-          <Wall position={[-11, 0, 0]} args={[1, 10, 22]} />
-          <Wall position={[11, 0, 0]} args={[1, 10, 22]} />
+          <Ceiling />
+          <Wall position={[0, 15, -10]} args={[22, 40, 1]} />
+          <Wall position={[0, 15, 10]} args={[22, 40, 1]} />
+          <Wall position={[-11, 15, 0]} args={[1, 40, 22]} />
+          <Wall position={[11, 15, 0]} args={[1, 40, 22]} />
 
           {dices.map((dice, i) => (
             <Dice
