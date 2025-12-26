@@ -8,8 +8,9 @@ export const gameSessions = pgTable("game_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   
   // 플레이어 상태
-  health: integer("health").notNull().default(3),
-  gold: integer("gold").notNull().default(8),
+  health: integer("health").notNull().default(100),
+  maxHealth: integer("max_health").notNull().default(100),
+  gold: integer("gold").notNull().default(0),
   score: integer("score").notNull().default(0),
   
   // 진행도
@@ -20,8 +21,9 @@ export const gameSessions = pgTable("game_sessions", {
   gameState: text("game_state").notNull().default('combat'),
   
   // 전투 상태
-  enemyHp: integer("enemy_hp").notNull().default(800),
-  maxEnemyHp: integer("max_enemy_hp").notNull().default(800),
+  enemyHp: integer("enemy_hp").notNull().default(300),
+  maxEnemyHp: integer("max_enemy_hp").notNull().default(300),
+  enemyDamage: integer("enemy_damage").notNull().default(10),
   rerollsLeft: integer("rerolls_left").notNull().default(3),
   
   // 주사위 상태 (JSON 배열)

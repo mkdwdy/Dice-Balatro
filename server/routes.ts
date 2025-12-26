@@ -24,14 +24,16 @@ export async function registerRoutes(
     try {
       const initialDices = createInitialDices();
       const newSession = await storage.createGameSession({
-        health: 3,
-        gold: 8,
+        health: 100,
+        maxHealth: 100,
+        gold: 0,
         score: 0,
         currentStage: 1,
         currentRound: 1,
         gameState: 'combat',
-        enemyHp: 800,
-        maxEnemyHp: 800,
+        enemyHp: 300,
+        maxEnemyHp: 300,
+        enemyDamage: 10,
         rerollsLeft: 3,
         dices: initialDices as any,
         jokers: [],
@@ -125,11 +127,20 @@ export async function registerRoutes(
       }
 
       const newEnemyHp = Math.max(0, session.enemyHp - damage);
-      const newGameState = newEnemyHp === 0 ? 'shop' : 'combat';
+      const enemyDamage = session.enemyDamage || 10;
+      const newPlayerHp = Math.max(0, session.health - enemyDamage);
       const newDices = createInitialDices();
+      
+      let newGameState = 'combat';
+      if (newPlayerHp === 0) {
+        newGameState = 'game_over';
+      } else if (newEnemyHp === 0) {
+        newGameState = 'shop';
+      }
 
       const updatedSession = await storage.updateGameSession(req.params.id, {
         enemyHp: newEnemyHp,
+        health: newPlayerHp,
         score: session.score + damage,
         dices: newDices as any,
         rerollsLeft: 3,

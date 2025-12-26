@@ -381,9 +381,15 @@ export default function GameScreen() {
               STAGE {game.currentStage}-{game.currentRound}
             </h1>
           </div>
-          <div className="text-right">
-            <div className="text-4xl font-black text-accent" data-testid="text-enemy-hp">{game.enemyHp}</div>
-            <p className="text-muted-foreground text-xs">ENEMY HP</p>
+          <div className="text-right flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-lg font-black text-orange-500" data-testid="text-enemy-damage">⚔️ {game.enemyDamage || 10}</div>
+              <p className="text-muted-foreground text-xs">ATTACK</p>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl font-black text-accent" data-testid="text-enemy-hp">{game.enemyHp}</div>
+              <p className="text-muted-foreground text-xs">ENEMY HP</p>
+            </div>
           </div>
         </div>
         
@@ -411,7 +417,7 @@ export default function GameScreen() {
             </div>
             <div className="bg-card border border-card-border rounded-lg px-3 py-2 flex items-center gap-2">
               <HeartIcon className="w-4 h-4 text-destructive" />
-              <span className="text-lg font-black text-destructive" data-testid="text-health">{game.health}</span>
+              <span className="text-lg font-black text-destructive" data-testid="text-health">{game.health}/{game.maxHealth || 100}</span>
             </div>
           </div>
 
@@ -544,7 +550,7 @@ export default function GameScreen() {
             </div>
             <div className="bg-card/90 backdrop-blur border border-card-border rounded px-2 py-1 flex items-center gap-1 shadow-lg">
               <HeartIcon className="w-3 h-3 text-destructive" />
-              <span className="font-bold text-sm">{game.health}</span>
+              <span className="font-bold text-sm">{game.health}/{game.maxHealth || 100}</span>
             </div>
           </div>
         </div>
