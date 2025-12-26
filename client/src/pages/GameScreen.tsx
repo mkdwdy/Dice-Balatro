@@ -410,81 +410,78 @@ export default function GameScreen() {
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Bottom Panel - Controls */}
-      <div className="flex-shrink-0 mt-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Mobile Stats (hidden on desktop) */}
-          <div className="lg:hidden flex gap-2 justify-center">
-            <div className="bg-card border border-card-border rounded px-3 py-1 flex items-center gap-2">
-              <RotateCcwIcon className="w-4 h-4 text-primary" />
-              <span className="font-bold">{game.rerollsLeft}</span>
-            </div>
-            <div className="bg-card border border-card-border rounded px-3 py-1 flex items-center gap-2">
-              <Crown className="w-4 h-4 text-primary" />
-              <span className="font-bold">${game.gold}</span>
-            </div>
-            <div className="bg-card border border-card-border rounded px-3 py-1 flex items-center gap-2">
-              <HeartIcon className="w-4 h-4 text-destructive" />
-              <span className="font-bold">{game.health}</span>
-            </div>
-          </div>
-
-          {/* Hand Info & Actions */}
-          <div className="flex gap-2 items-center justify-center md:justify-end">
+          {/* Floating Controls - Bottom Right */}
+          <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 items-end">
             {selectedHand && (
-              <div className="bg-card border border-primary rounded-lg px-3 py-2 text-center">
+              <div className="bg-card/90 backdrop-blur border border-primary rounded-lg px-3 py-2 text-center shadow-lg">
                 <div className="text-sm font-black text-primary" data-testid="text-hand-name">{selectedHand.name}</div>
                 <div className="text-lg font-black text-accent" data-testid="text-calculated-damage">{calculateScore()} DMG</div>
               </div>
             )}
 
-            <div className="relative">
-              <button
-                onMouseDown={startCharging}
-                onMouseUp={releaseCharge}
-                onMouseLeave={() => isCharging && releaseCharge()}
-                onTouchStart={startCharging}
-                onTouchEnd={releaseCharge}
-                disabled={game.rerollsLeft === 0 || rolling}
-                data-testid="button-reroll"
-                className={`relative overflow-hidden font-black py-2 px-4 rounded-lg transition-all select-none ${
-                  game.rerollsLeft === 0 || rolling
-                    ? 'bg-muted text-muted-foreground'
-                    : isCharging
-                    ? 'bg-accent text-accent-foreground scale-105'
-                    : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'
-                }`}
-              >
-                {isCharging && (
-                  <div 
-                    className="absolute inset-0 bg-primary/50 transition-all"
-                    style={{ width: `${chargePower * 100}%` }}
-                  />
+            <div className="flex gap-2">
+              <div className="relative">
+                <button
+                  onMouseDown={startCharging}
+                  onMouseUp={releaseCharge}
+                  onMouseLeave={() => isCharging && releaseCharge()}
+                  onTouchStart={startCharging}
+                  onTouchEnd={releaseCharge}
+                  disabled={game.rerollsLeft === 0 || rolling}
+                  data-testid="button-reroll"
+                  className={`relative overflow-hidden font-black py-3 px-5 rounded-lg transition-all select-none shadow-lg ${
+                    game.rerollsLeft === 0 || rolling
+                      ? 'bg-muted text-muted-foreground'
+                      : isCharging
+                      ? 'bg-accent text-accent-foreground scale-105'
+                      : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'
+                  }`}
+                >
+                  {isCharging && (
+                    <div 
+                      className="absolute inset-0 bg-primary/50 transition-all"
+                      style={{ width: `${chargePower * 100}%` }}
+                    />
+                  )}
+                  <span className="relative flex items-center gap-1">
+                    {isCharging ? <Zap className="w-4 h-4 animate-pulse" /> : <RotateCcwIcon className="w-4 h-4" />}
+                    {isCharging ? `${Math.round(chargePower * 100)}%` : 'HOLD'}
+                  </span>
+                </button>
+                {!isCharging && !rolling && game.rerollsLeft > 0 && (
+                  <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-white/70 whitespace-nowrap drop-shadow">
+                    Hold longer = stronger
+                  </span>
                 )}
-                <span className="relative flex items-center gap-1">
-                  {isCharging ? <Zap className="w-4 h-4 animate-pulse" /> : <RotateCcwIcon className="w-4 h-4" />}
-                  {isCharging ? `${Math.round(chargePower * 100)}%` : 'HOLD'}
-                </span>
-              </button>
-              {!isCharging && !rolling && game.rerollsLeft > 0 && (
-                <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-muted-foreground whitespace-nowrap">
-                  Hold longer = stronger
-                </span>
-              )}
-            </div>
+              </div>
 
-            <button
-              onClick={submitHand}
-              disabled={!selectedHand || damageDealt !== null || rolling}
-              data-testid="button-submit"
-              className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-2 px-4 rounded-lg transition-colors flex items-center gap-1"
-            >
-              <CheckCircleIcon className="w-4 h-4" />
-              SUBMIT
-            </button>
+              <button
+                onClick={submitHand}
+                disabled={!selectedHand || damageDealt !== null || rolling}
+                data-testid="button-submit"
+                className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-3 px-5 rounded-lg transition-colors flex items-center gap-1 shadow-lg"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+                SUBMIT
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Stats - Top Left */}
+          <div className="lg:hidden absolute top-4 left-4 z-20 flex gap-2">
+            <div className="bg-card/90 backdrop-blur border border-card-border rounded px-2 py-1 flex items-center gap-1 shadow-lg">
+              <RotateCcwIcon className="w-3 h-3 text-primary" />
+              <span className="font-bold text-sm">{game.rerollsLeft}</span>
+            </div>
+            <div className="bg-card/90 backdrop-blur border border-card-border rounded px-2 py-1 flex items-center gap-1 shadow-lg">
+              <Crown className="w-3 h-3 text-primary" />
+              <span className="font-bold text-sm">${game.gold}</span>
+            </div>
+            <div className="bg-card/90 backdrop-blur border border-card-border rounded px-2 py-1 flex items-center gap-1 shadow-lg">
+              <HeartIcon className="w-3 h-3 text-destructive" />
+              <span className="font-bold text-sm">{game.health}</span>
+            </div>
           </div>
         </div>
       </div>
