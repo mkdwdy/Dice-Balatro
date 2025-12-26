@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown, Zap } from 'lucide-react';
+import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown, Zap, RefreshCw } from 'lucide-react';
 import DiceBoard from '@/components/Dice3D';
 import type { GameSession, Dice } from '@shared/schema';
 
@@ -553,6 +553,20 @@ export default function GameScreen() {
               <span className="font-bold text-sm">{game.health}/{game.maxHealth || 100}</span>
             </div>
           </div>
+
+          {/* Reset Button - Bottom Left */}
+          <button
+            onClick={async () => {
+              const response = await fetch('/api/games/new', { method: 'POST' });
+              const newGame = await response.json();
+              setLocation(`/stage-select/${newGame.id}`);
+            }}
+            data-testid="button-reset"
+            className="absolute bottom-4 left-4 z-20 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg text-sm font-bold"
+          >
+            <RefreshCw className="w-4 h-4" />
+            RESET
+          </button>
         </div>
       </div>
     </div>
