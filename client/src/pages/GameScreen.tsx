@@ -250,7 +250,7 @@ export default function GameScreen() {
       chargeIntervalRef.current = null;
     }
     
-    const finalPower = chargePower;
+    const finalPower = Math.max(chargePower, 0.1);
     setIsCharging(false);
     setChargePower(0);
     setRollPower(finalPower);
