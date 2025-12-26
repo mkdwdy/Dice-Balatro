@@ -53,7 +53,17 @@ function createDiceFaceTexture(value: number, suit: string) {
 
   if (value >= 1 && value <= 9) {
     const positions = PIP_POSITIONS[value];
-    const fontSize = value <= 4 ? 60 : value <= 6 ? 50 : 40;
+    const isCircle = symbol === '●';
+    
+    let fontSize: number;
+    if (value === 1) {
+      fontSize = isCircle ? 60 * 3 : 60 * 3;
+    } else if (isCircle) {
+      fontSize = value <= 4 ? 60 : value <= 6 ? 50 : 40;
+    } else {
+      fontSize = value <= 4 ? 90 : value <= 6 ? 75 : 60;
+    }
+    
     ctx.font = `${fontSize}px sans-serif`;
     
     for (const [x, y] of positions) {
