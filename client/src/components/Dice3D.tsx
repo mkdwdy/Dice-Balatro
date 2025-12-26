@@ -20,6 +20,18 @@ const SUIT_TEXT_COLORS: Record<string, string> = {
   '♣': '#ffffff',
 };
 
+const PIP_POSITIONS: Record<number, [number, number][]> = {
+  1: [[128, 128]],
+  2: [[70, 70], [186, 186]],
+  3: [[70, 70], [128, 128], [186, 186]],
+  4: [[70, 70], [186, 70], [70, 186], [186, 186]],
+  5: [[70, 70], [186, 70], [128, 128], [70, 186], [186, 186]],
+  6: [[70, 70], [186, 70], [70, 128], [186, 128], [70, 186], [186, 186]],
+  7: [[70, 70], [186, 70], [70, 128], [128, 128], [186, 128], [70, 186], [186, 186]],
+  8: [[70, 70], [128, 70], [186, 70], [70, 128], [186, 128], [70, 186], [128, 186], [186, 186]],
+  9: [[70, 70], [128, 70], [186, 70], [70, 128], [128, 128], [186, 128], [70, 186], [128, 186], [186, 186]],
+};
+
 function createDiceFaceTexture(value: number, suit: string) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -30,19 +42,31 @@ function createDiceFaceTexture(value: number, suit: string) {
   ctx.fillRect(0, 0, 256, 256);
 
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 10;
+  ctx.lineWidth = 8;
   ctx.strokeRect(0, 0, 256, 256);
 
   ctx.fillStyle = SUIT_TEXT_COLORS[suit] || '#000000';
-  ctx.font = 'bold 120px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  
-  ctx.fillText(value.toString(), 128, 128);
 
-  if (suit !== 'None') {
-    ctx.font = '60px sans-serif';
-    ctx.fillText(suit, 200, 200);
+  const symbol = (suit === 'None' || !suit) ? '●' : suit;
+
+  if (value >= 1 && value <= 9) {
+    const positions = PIP_POSITIONS[value];
+    const fontSize = value <= 4 ? 60 : value <= 6 ? 50 : 40;
+    ctx.font = `${fontSize}px sans-serif`;
+    
+    for (const [x, y] of positions) {
+      ctx.fillText(symbol, x, y);
+    }
+  } else {
+    ctx.font = 'bold 100px sans-serif';
+    ctx.fillText(value.toString(), 128, 128);
+    
+    if (suit !== 'None' && suit) {
+      ctx.font = '40px sans-serif';
+      ctx.fillText(suit, 200, 210);
+    }
   }
 
   return new THREE.CanvasTexture(canvas);
