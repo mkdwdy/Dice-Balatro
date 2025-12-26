@@ -60,12 +60,12 @@ interface DiceProps {
 }
 
 const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
-  1: [Math.PI / 2, 0, 0],
+  1: [-Math.PI / 2, 0, 0],
   2: [0, 0, Math.PI / 2],
   3: [0, 0, 0],
   4: [Math.PI, 0, 0],
   5: [0, 0, -Math.PI / 2],
-  6: [-Math.PI / 2, 0, 0],
+  6: [Math.PI / 2, 0, 0],
 };
 
 function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power }: DiceProps) {
