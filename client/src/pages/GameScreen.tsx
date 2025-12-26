@@ -118,6 +118,93 @@ export default function GameScreen() {
   const [enemyHp, setEnemyHp] = useState(800);
   const [damageDealt, setDamageDealt] = useState<number | null>(null);
 
+  // 족보에 사용되는 주사위 개수 반환 함수
+  const getActiveDiceCount = (handName: string, lockedDices: Dice[]): number => {
+    const counts = countValues(lockedDices.map(d => d.value));
+    const sortedCounts = Object.values(counts).sort((a, b) => b - a);
+
+    switch (handName) {
+      case 'Yahtzee':
+      case 'Straight Flush':
+      case 'Straight 5':
+      case 'Full House':
+      case 'Flush':
+        return lockedDices.length;
+      case 'Four of a Kind':
+        return 4;
+      case 'Two Pair':
+        return 4;
+      case 'Triple':
+        return 3;
+      case 'Straight 4':
+        return 4;
+      case 'Pair':
+        return 2;
+      case 'Straight 3':
+        return 3;
+      case 'High Dice':
+        return 1;
+      default:
+        return lockedDices.length;
+    }
+  };
+
+  // 족보에 사용되는 주사위들만 점수 계산
+  const getActiveDicesSum = (handName: string, lockedDices: Dice[]): number => {
+    if (lockedDices.length === 0) return 0;
+
+    const values = lockedDices.map(d => d.value).sort((a, b) => b - a);
+    const counts = countValues(lockedDices.map(d => d.value));
+
+    switch (handName) {
+      case 'Yahtzee':
+      case 'Straight Flush':
+      case 'Straight 5':
+      case 'Full House':
+      case 'Flush':
+        return values.reduce((a, b) => a + b, 0);
+      case 'Four of a Kind': {
+        const sortedCounts = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        if (sortedCounts[0]?.[1] >= 4) {
+          const num = parseInt(sortedCounts[0][0]);
+          return num * 4;
+        }
+        return 0;
+      }
+      case 'Two Pair': {
+        const pairs = Object.entries(counts).filter(([_, c]) => c >= 2).sort((a, b) => parseInt(b[0]) - parseInt(a[0]));
+        if (pairs.length >= 2) {
+          return (parseInt(pairs[0][0]) * 2) + (parseInt(pairs[1][0]) * 2);
+        }
+        return 0;
+      }
+      case 'Triple': {
+        const sortedCounts = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        if (sortedCounts[0]?.[1] >= 3) {
+          const num = parseInt(sortedCounts[0][0]);
+          return num * 3;
+        }
+        return 0;
+      }
+      case 'Straight 4':
+        return values.slice(0, 4).reduce((a, b) => a + b, 0);
+      case 'Pair': {
+        const sortedCounts = Object.entries(counts).filter(([_, c]) => c >= 2).sort((a, b) => parseInt(b[0]) - parseInt(a[0]));
+        if (sortedCounts[0]) {
+          const num = parseInt(sortedCounts[0][0]);
+          return num * 2;
+        }
+        return 0;
+      }
+      case 'Straight 3':
+        return values.slice(0, 3).reduce((a, b) => a + b, 0);
+      case 'High Dice':
+        return values[0] || 0;
+      default:
+        return values.reduce((a, b) => a + b, 0);
+    }
+  };
+
   // 자동 핸드 선택 로직
   const selectedHand = useMemo(() => {
     const lockedDices = dices.filter(d => d.locked);
@@ -152,11 +239,18 @@ export default function GameScreen() {
     }
   };
 
+  // 현재 표시용 정보
+  const lockedDices = useMemo(() => dices.filter(d => d.locked), [dices]);
+  const lockedCount = lockedDices.length;
+  const activeDicesSum = useMemo(() => {
+    if (!selectedHand || lockedDices.length === 0) return 0;
+    return getActiveDicesSum(selectedHand.name, lockedDices);
+  }, [selectedHand, lockedDices]);
+
   const calculateScore = () => {
-    const lockedDices = dices.filter(d => d.locked);
-    const sum = lockedDices.reduce((acc, d) => acc + d.value, 0);
-    const multiplier = selectedHand?.multiplier || 0;
-    return sum * (multiplier + 1);
+    if (!selectedHand) return 0;
+    const multiplier = selectedHand.multiplier || 0;
+    return activeDicesSum * (multiplier + 1);
   };
 
   const submitHand = () => {
@@ -180,8 +274,6 @@ export default function GameScreen() {
       }, 1500);
     }
   };
-
-  const lockedCount = dices.filter(d => d.locked).length;
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6 font-sans">
@@ -302,15 +394,25 @@ export default function GameScreen() {
 
           {/* Auto-Selected Hand */}
           <div className="bg-card border-2 border-primary rounded-lg p-4">
-            <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Current Hand</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase mb-3">Current Hand</p>
             {selectedHand ? (
               <>
-                <div className="text-2xl font-black text-primary mb-2">{selectedHand.name}</div>
-                <div className="text-xs text-muted-foreground mb-3">
-                  x{selectedHand.multiplier + 1} multiplier
-                </div>
-                <div className="text-sm font-bold text-accent">
-                  Damage: {calculateScore()}
+                <div className="text-2xl font-black text-primary mb-1">{selectedHand.name}</div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Dice Sum:</span>
+                    <span className="font-black text-foreground">{activeDicesSum}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Multiplier:</span>
+                    <span className="font-black text-primary">x{selectedHand.multiplier + 1}</span>
+                  </div>
+                  <div className="pt-2 border-t border-card-border">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-muted-foreground">Damage:</span>
+                      <span className="text-lg font-black text-accent">{calculateScore()}</span>
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
