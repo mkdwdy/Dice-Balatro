@@ -54,10 +54,9 @@ interface DiceProps {
   value: number;
   suit: string;
   isLocked: boolean;
-  onLockToggle: () => void;
+  onLockToggle: (id: number, detectedValue: number) => void;
   rolling: boolean;
   power: number;
-  onValueDetected: (id: number, value: number) => void;
 }
 
 const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
@@ -69,11 +68,8 @@ const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
   6: [-Math.PI / 2, 0, 0],
 };
 
-function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power, onValueDetected }: DiceProps) {
+function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power }: DiceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const [hasReportedValue, setHasReportedValue] = useState(false);
-  const lastVelocityRef = useRef<number>(0);
-  const stableFramesRef = useRef<number>(0);
   
   const initialRotation: [number, number, number] = VALUE_TO_ROTATION[value] || [0, 0, 0];
   
@@ -113,9 +109,6 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
 
   useEffect(() => {
     if (rolling && !isLocked) {
-      setHasReportedValue(false);
-      stableFramesRef.current = 0;
-      
       const powerMultiplier = 0.5 + power * 1.5;
       
       api.velocity.set(0, 5 * powerMultiplier, 0);
@@ -141,32 +134,17 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
     if (isLocked) {
       api.velocity.set(0, 0, 0);
       api.angularVelocity.set(0, 0, 0);
-      return;
     }
-
-    if (!rolling || hasReportedValue) return;
-
-    const mesh = meshRef.current;
-    if (!mesh) return;
-
-    api.velocity.subscribe((velocity) => {
-      const speed = Math.sqrt(velocity[0] ** 2 + velocity[1] ** 2 + velocity[2] ** 2);
-      
-      if (speed < 0.1 && lastVelocityRef.current < 0.1) {
-        stableFramesRef.current++;
-        
-        if (stableFramesRef.current > 30 && !hasReportedValue) {
-          const topFaceValue = getTopFaceValue(mesh);
-          onValueDetected(id, topFaceValue);
-          setHasReportedValue(true);
-        }
-      } else {
-        stableFramesRef.current = 0;
-      }
-      
-      lastVelocityRef.current = speed;
-    })();
   });
+
+  const handleClick = (e: any) => {
+    e.stopPropagation();
+    const mesh = meshRef.current;
+    if (mesh) {
+      const topValue = getTopFaceValue(mesh);
+      onLockToggle(id, topValue);
+    }
+  };
 
   return (
     <mesh
@@ -174,10 +152,7 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
         (ref as any).current = node;
         meshRef.current = node as THREE.Mesh;
       }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onLockToggle();
-      }}
+      onClick={handleClick}
       castShadow
       receiveShadow
       material={materials}
@@ -307,33 +282,12 @@ function Wall({ position, args }: { position: [number, number, number], args: [n
 
 interface DiceBoardProps {
   dices: { id: number; value: number; suit: string; locked: boolean }[];
-  onLockToggle: (id: number) => void;
+  onLockToggle: (id: number, detectedValue: number) => void;
   rolling: boolean;
   power?: number;
-  onDiceValuesDetected?: (values: Record<number, number>) => void;
 }
 
-function DiceScene({ dices, onLockToggle, rolling, power = 1, onDiceValuesDetected }: DiceBoardProps) {
-  const detectedValuesRef = useRef<Record<number, number>>({});
-  const expectedDiceCountRef = useRef<number>(0);
-
-  useEffect(() => {
-    if (rolling) {
-      detectedValuesRef.current = {};
-      const unlockedCount = dices.filter(d => !d.locked).length;
-      expectedDiceCountRef.current = unlockedCount;
-    }
-  }, [rolling, dices]);
-
-  const handleValueDetected = useCallback((id: number, value: number) => {
-    detectedValuesRef.current[id] = value;
-    
-    const detectedCount = Object.keys(detectedValuesRef.current).length;
-    if (detectedCount >= expectedDiceCountRef.current && onDiceValuesDetected) {
-      onDiceValuesDetected({ ...detectedValuesRef.current });
-    }
-  }, [onDiceValuesDetected]);
-
+function DiceScene({ dices, onLockToggle, rolling, power = 1 }: DiceBoardProps) {
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 25, 1]} fov={35} onUpdate={c => c.lookAt(0, 0, 0)} />
@@ -368,10 +322,9 @@ function DiceScene({ dices, onLockToggle, rolling, power = 1, onDiceValuesDetect
             value={dice.value}
             suit={dice.suit}
             isLocked={dice.locked}
-            onLockToggle={() => onLockToggle(dice.id)}
+            onLockToggle={onLockToggle}
             rolling={rolling}
             power={power}
-            onValueDetected={handleValueDetected}
           />
         ))}
       </Physics>
@@ -379,7 +332,7 @@ function DiceScene({ dices, onLockToggle, rolling, power = 1, onDiceValuesDetect
   );
 }
 
-export default function DiceBoard({ dices, onLockToggle, rolling, power = 1, onDiceValuesDetected }: DiceBoardProps) {
+export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: DiceBoardProps) {
   return (
     <div className="w-full h-full rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/80 relative">
       <Canvas shadows dpr={[1, 2]}>
@@ -388,7 +341,6 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1, onD
           onLockToggle={onLockToggle} 
           rolling={rolling} 
           power={power}
-          onDiceValuesDetected={onDiceValuesDetected}
         />
       </Canvas>
       

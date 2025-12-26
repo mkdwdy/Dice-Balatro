@@ -74,7 +74,7 @@ export async function registerRoutes(
     }
   });
 
-  // 주사위 굴리기 (물리 기반 값 사용)
+  // 주사위 굴리기 (클라이언트에서 락된 값 전달)
   app.post('/api/games/:id/roll', async (req, res) => {
     try {
       const session = await storage.getGameSession(req.params.id);
@@ -86,17 +86,24 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'No rerolls left' });
       }
 
-      const { detectedValues } = req.body;
+      const { lockedDices } = req.body;
+      const lockedMap: Record<number, number> = {};
+      if (lockedDices && Array.isArray(lockedDices)) {
+        lockedDices.forEach((d: { id: number; value: number }) => {
+          lockedMap[d.id] = d.value;
+        });
+      }
+      
       const currentDices = session.dices as Dice[];
       
       const newDices = currentDices.map(d => {
-        if (d.locked) return d;
-        const detectedValue = detectedValues?.[d.id];
+        if (lockedMap[d.id] !== undefined) {
+          return { ...d, value: lockedMap[d.id], locked: true };
+        }
         return { 
           ...d, 
-          value: detectedValue && detectedValue >= 1 && detectedValue <= 6 
-            ? detectedValue 
-            : Math.floor(Math.random() * 6) + 1 
+          value: Math.floor(Math.random() * 6) + 1,
+          locked: false
         };
       });
 

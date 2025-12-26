@@ -165,7 +165,6 @@ export default function GameScreen() {
   const chargeStartRef = useRef<number>(0);
   const chargeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const MAX_CHARGE_TIME = 1500;
-  const pendingRollRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (match && params?.id) {
@@ -209,8 +208,13 @@ export default function GameScreen() {
     return null;
   }, [dices]);
 
-  const toggleLock = (id: number) => {
-    setDices(dices.map(d => d.id === id ? { ...d, locked: !d.locked } : d));
+  const toggleLock = (id: number, detectedValue: number) => {
+    setDices(dices.map(d => {
+      if (d.id === id) {
+        return { ...d, locked: !d.locked, value: detectedValue };
+      }
+      return d;
+    }));
   };
 
   const startCharging = useCallback(() => {
@@ -241,29 +245,26 @@ export default function GameScreen() {
     setRollPower(finalPower);
     
     setRolling(true);
-    pendingRollRef.current = true;
-    const updatedDices = dices.map(d => d.locked ? d : { ...d, locked: false });
-    setDices(updatedDices);
-  }, [isCharging, game, chargePower, dices]);
-
-  const handleDiceValuesDetected = useCallback(async (detectedValues: Record<number, number>) => {
-    if (!game || !pendingRollRef.current) return;
-    pendingRollRef.current = false;
     
     try {
       const response = await fetch(`/api/games/${game.id}/roll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ detectedValues }),
+        body: JSON.stringify({ 
+          lockedDices: dices.filter(d => d.locked).map(d => ({ id: d.id, value: d.value }))
+        }),
       });
       const updatedGame = await response.json();
-      setGame(updatedGame);
-      setRolling(false);
+      
+      setTimeout(() => {
+        setGame(updatedGame);
+        setRolling(false);
+      }, 1500);
     } catch (error) {
       console.error('Failed to roll dices:', error);
       setRolling(false);
     }
-  }, [game]);
+  }, [isCharging, game, chargePower, dices]);
 
   useEffect(() => {
     return () => {
@@ -385,7 +386,7 @@ export default function GameScreen() {
 
         {/* Center - 3D Dice Board */}
         <div className="lg:col-span-3 relative min-h-0">
-          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} power={rollPower} onDiceValuesDetected={handleDiceValuesDetected} />
+          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} power={rollPower} />
           
           {damageDealt && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none animate-in fade-in duration-300">
@@ -423,7 +424,7 @@ export default function GameScreen() {
               {dices.map(dice => (
                 <div
                   key={dice.id}
-                  onClick={() => toggleLock(dice.id)}
+                  onClick={() => toggleLock(dice.id, dice.value)}
                   data-testid={`dice-2d-${dice.id}`}
                   className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all ${
                     dice.locked
