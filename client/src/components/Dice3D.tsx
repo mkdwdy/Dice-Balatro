@@ -75,9 +75,7 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
   const lastVelocityRef = useRef<number>(0);
   const stableFramesRef = useRef<number>(0);
   
-  const initialRotation: [number, number, number] = isLocked 
-    ? (VALUE_TO_ROTATION[value] || [0, 0, 0]) 
-    : [0, 0, 0];
+  const initialRotation: [number, number, number] = VALUE_TO_ROTATION[value] || [0, 0, 0];
   
   const [ref, api] = useBox(() => ({
     mass: isLocked ? 0 : 1.5,
