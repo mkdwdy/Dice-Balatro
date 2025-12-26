@@ -62,10 +62,10 @@ interface DiceProps {
 
 function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }: DiceProps) {
   const [ref, api] = useBox(() => ({
-    mass: 3,
+    mass: 1.5,
     position,
-    args: [3, 3, 3],
-    material: { friction: 0.1, restitution: 0.5 },
+    args: [1.5, 1.5, 1.5],
+    material: { friction: 0.1, restitution: 0.6 },
   }));
 
   const texture = useMemo(() => createDiceFaceTexture(value, suit), [value, suit]);
@@ -110,11 +110,11 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }:
       castShadow
       receiveShadow
     >
-      <boxGeometry args={[3, 3, 3]} />
+      <boxGeometry args={[1.5, 1.5, 1.5]} />
       <meshStandardMaterial map={texture} color={isLocked ? '#ffff00' : '#ffffff'} />
       {isLocked && (
-        <mesh position={[0, 2.5, 0]}>
-          <boxGeometry args={[0.5, 0.5, 0.5]} />
+        <mesh position={[0, 1.5, 0]}>
+          <boxGeometry args={[0.3, 0.3, 0.3]} />
           <meshBasicMaterial color="yellow" />
         </mesh>
       )}
@@ -242,7 +242,7 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: D
           {dices.map((dice, i) => (
             <Dice
               key={dice.id}
-              position={[(i - 2) * 4.5, 8 + i * 2, 0]} 
+              position={[(i - 2) * 2.5, 6 + i, 0]} 
               value={dice.value}
               suit={dice.suit}
               isLocked={dice.locked}
