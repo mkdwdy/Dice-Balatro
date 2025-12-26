@@ -5,37 +5,15 @@ import { insertGameSessionSchema, updateGameSessionSchema, type Dice } from "@sh
 
 const FIXED_SUITS = ['None', '♠', '♦', '♥', '♣'];
 
-// 스테이지별 적 HP와 골드 보상 계산
-function getStageStats(stage: number, difficulty: string) {
+// 스테이지별 적 HP와 골드 보상 계산 (순차 진행 방식)
+function getStageStats(stage: number) {
   const baseHp = 100;
   const baseReward = 3;
   const stageMultiplier = 1 + (stage - 1) * 0.5; // 스테이지마다 50% 증가
   
-  let difficultyMultiplier = 1;
-  let rewardMultiplier = 1;
-  
-  switch (difficulty) {
-    case 'easy':
-      difficultyMultiplier = 1;
-      rewardMultiplier = 1;
-      break;
-    case 'medium':
-      difficultyMultiplier = 1.5;
-      rewardMultiplier = 1.5;
-      break;
-    case 'hard':
-      difficultyMultiplier = 2;
-      rewardMultiplier = 2;
-      break;
-    case 'boss':
-      difficultyMultiplier = 3;
-      rewardMultiplier = 4;
-      break;
-  }
-  
   return {
-    enemyHp: Math.round(baseHp * stageMultiplier * difficultyMultiplier),
-    goldReward: Math.round(baseReward * stageMultiplier * rewardMultiplier),
+    enemyHp: Math.round(baseHp * stageMultiplier),
+    goldReward: Math.round(baseReward * stageMultiplier),
     enemyDamage: Math.round(10 + (stage - 1) * 2), // 스테이지마다 데미지 증가
   };
 }
@@ -212,12 +190,7 @@ export async function registerRoutes(
 
       // 다음 스테이지 번호 계산 (현재 스테이지 + 1)
       const nextStage = session.currentStage + 1;
-      const stageStats = getStageStats(nextStage, stageChoice);
-      let newRound = session.currentRound;
-
-      if (stageChoice === 'boss') {
-        newRound += 1;
-      }
+      const stageStats = getStageStats(nextStage);
 
       const updatedSession = await storage.updateGameSession(req.params.id, {
         gameState: 'combat',
@@ -225,7 +198,6 @@ export async function registerRoutes(
         maxEnemyHp: stageStats.enemyHp,
         enemyDamage: stageStats.enemyDamage,
         pendingGoldReward: stageStats.goldReward,
-        currentRound: newRound,
         currentStage: nextStage,
         rerollsLeft: 3,
         dices: [] as any,

@@ -554,21 +554,22 @@ export default function GameScreen() {
             </div>
           </div>
 
-          {/* Reset Button - Bottom Left */}
-          <button
-            onClick={async () => {
-              const response = await fetch('/api/games/new', { method: 'POST' });
-              const newGame = await response.json();
-              setLocation(`/stage-select/${newGame.id}`);
-            }}
-            data-testid="button-reset"
-            className="absolute bottom-4 left-4 z-20 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg text-sm font-bold"
-          >
-            <RefreshCw className="w-4 h-4" />
-            RESET
-          </button>
         </div>
       </div>
+
+      {/* Reset Button - Bottom Left (Global) */}
+      <button
+        onClick={async () => {
+          const response = await fetch('/api/games/new', { method: 'POST' });
+          const newGame = await response.json();
+          setLocation(`/stage-select/${newGame.id}`);
+        }}
+        data-testid="button-reset"
+        className="fixed bottom-4 left-4 z-50 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg text-sm font-bold"
+      >
+        <RefreshCw className="w-4 h-4" />
+        RESET
+      </button>
     </div>
   );
 }

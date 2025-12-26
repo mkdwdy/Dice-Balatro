@@ -1,72 +1,20 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { Swords, Target, Skull, Crown, HeartIcon } from 'lucide-react';
+import { Swords, HeartIcon, Crown, RefreshCw, Play } from 'lucide-react';
 import type { GameSession } from '@shared/schema';
 
-// 스테이지별 스탯 계산 (서버와 동일한 로직)
-function getStageStats(stage: number, difficulty: string) {
+// 스테이지별 스탯 계산
+function getStageStats(stage: number) {
   const baseHp = 100;
   const baseReward = 3;
   const stageMultiplier = 1 + (stage - 1) * 0.5;
   
-  let difficultyMultiplier = 1;
-  let rewardMultiplier = 1;
-  
-  switch (difficulty) {
-    case 'easy':
-      difficultyMultiplier = 1;
-      rewardMultiplier = 1;
-      break;
-    case 'medium':
-      difficultyMultiplier = 1.5;
-      rewardMultiplier = 1.5;
-      break;
-    case 'hard':
-      difficultyMultiplier = 2;
-      rewardMultiplier = 2;
-      break;
-    case 'boss':
-      difficultyMultiplier = 3;
-      rewardMultiplier = 4;
-      break;
-  }
-  
   return {
-    enemyHp: Math.round(baseHp * stageMultiplier * difficultyMultiplier),
-    goldReward: Math.round(baseReward * stageMultiplier * rewardMultiplier),
+    enemyHp: Math.round(baseHp * stageMultiplier),
+    goldReward: Math.round(baseReward * stageMultiplier),
+    enemyDamage: Math.round(10 + (stage - 1) * 2),
   };
 }
-
-const STAGE_DIFFICULTIES = [
-  { 
-    id: 'easy', 
-    name: 'Easy', 
-    icon: Target,
-    color: 'text-green-500',
-    description: 'Low HP enemy',
-  },
-  { 
-    id: 'medium', 
-    name: 'Medium', 
-    icon: Swords,
-    color: 'text-yellow-500',
-    description: 'Medium HP enemy',
-  },
-  { 
-    id: 'hard', 
-    name: 'Hard', 
-    icon: Skull,
-    color: 'text-red-500',
-    description: 'High HP enemy',
-  },
-  { 
-    id: 'boss', 
-    name: 'BOSS', 
-    icon: Crown,
-    color: 'text-purple-500',
-    description: 'Advance round',
-  },
-];
 
 export default function StageSelectPage() {
   const [match, params] = useRoute('/stage-select/:id');
@@ -92,19 +40,25 @@ export default function StageSelectPage() {
     }
   };
 
-  const selectStage = async (stageChoice: string) => {
+  const startBattle = async () => {
     if (!game) return;
 
     try {
       await fetch(`/api/games/${game.id}/next-stage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stageChoice }),
+        body: JSON.stringify({ stageChoice: 'easy' }),
       });
       setLocation(`/game/${game.id}`);
     } catch (error) {
-      console.error('Failed to select stage:', error);
+      console.error('Failed to start battle:', error);
     }
+  };
+
+  const resetGame = async () => {
+    const response = await fetch('/api/games/new', { method: 'POST' });
+    const newGame = await response.json();
+    setLocation(`/stage-select/${newGame.id}`);
   };
 
   if (loading) {
@@ -128,17 +82,20 @@ export default function StageSelectPage() {
     );
   }
 
+  const nextStage = game.currentStage + 1;
+  const upcomingStages = [0, 1, 2, 3, 4].map(offset => nextStage + offset);
+
   return (
-    <div className="h-screen bg-background text-foreground p-4 flex flex-col items-center justify-center overflow-hidden">
-      <div className="max-w-3xl w-full">
+    <div className="h-screen bg-background text-foreground p-4 flex flex-col items-center justify-center overflow-hidden relative">
+      <div className="max-w-4xl w-full">
         {/* Header */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl sm:text-4xl font-black text-primary mb-2">SELECT BATTLE</h1>
-          <p className="text-lg text-muted-foreground">Select Stage {game.currentStage + 1}</p>
+          <h1 className="text-3xl sm:text-4xl font-black text-primary mb-2">STAGE MAP</h1>
+          <p className="text-lg text-muted-foreground">Your journey ahead</p>
           <div className="flex items-center justify-center gap-6 mt-3">
             <div className="flex items-center gap-2">
               <HeartIcon className="w-4 h-4 text-destructive" />
-              <span className="text-lg font-bold">{game.health} HP</span>
+              <span className="text-lg font-bold">{game.health}/{game.maxHealth || 100} HP</span>
             </div>
             <div className="flex items-center gap-2">
               <Crown className="w-4 h-4 text-primary" />
@@ -147,44 +104,78 @@ export default function StageSelectPage() {
           </div>
         </div>
 
-        {/* Stage Options */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {STAGE_DIFFICULTIES.map((stage) => {
-            const Icon = stage.icon;
-            const stats = getStageStats(game.currentStage + 1, stage.id);
+        {/* Stage Preview - Horizontal progression */}
+        <div className="flex items-center justify-center gap-2 mb-8 overflow-x-auto pb-4">
+          {upcomingStages.map((stageNum, index) => {
+            const stats = getStageStats(stageNum);
+            const isNext = index === 0;
+            
             return (
-              <button
-                key={stage.id}
-                onClick={() => selectStage(stage.id)}
-                data-testid={`button-stage-${stage.id}`}
-                className="bg-card border-2 border-card-border hover:border-primary rounded-xl p-4 transition-all duration-200 transform hover:scale-105 text-left"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <Icon className={`w-6 h-6 ${stage.color}`} />
-                  <h2 className="text-lg font-black">{stage.name}</h2>
-                </div>
-                <p className="text-xs text-muted-foreground mb-3">{stage.description}</p>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
-                    <span className="text-xs text-muted-foreground">HP:</span>
-                    <span className="text-sm font-black text-accent">{stats.enemyHp}</span>
+              <div key={stageNum} className="flex items-center">
+                <div
+                  className={`flex-shrink-0 rounded-xl p-4 transition-all ${
+                    isNext 
+                      ? 'bg-primary/20 border-2 border-primary scale-110 shadow-lg' 
+                      : 'bg-card border border-card-border opacity-60'
+                  }`}
+                  style={{ minWidth: isNext ? '140px' : '100px' }}
+                >
+                  <div className="text-center">
+                    <div className={`text-xs font-bold mb-1 ${isNext ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {isNext ? 'NEXT' : `Stage ${stageNum}`}
+                    </div>
+                    <Swords className={`w-6 h-6 mx-auto mb-2 ${isNext ? 'text-accent' : 'text-muted-foreground'}`} />
+                    <div className={`text-lg font-black ${isNext ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {stageNum}
+                    </div>
+                    {isNext && (
+                      <div className="mt-2 space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">HP:</span>
+                          <span className="font-bold text-accent">{stats.enemyHp}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">ATK:</span>
+                          <span className="font-bold text-orange-500">{stats.enemyDamage}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Gold:</span>
+                          <span className="font-bold text-primary">+{stats.goldReward}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
-                    <span className="text-xs text-muted-foreground">Reward:</span>
-                    <span className="text-sm font-black text-primary">+${stats.goldReward}</span>
-                  </div>
                 </div>
-              </button>
+                {index < upcomingStages.length - 1 && (
+                  <div className="w-4 h-0.5 bg-muted-foreground/30 flex-shrink-0" />
+                )}
+              </div>
             );
           })}
         </div>
 
-        {/* Footer */}
-        <div className="text-center text-xs text-muted-foreground mt-4">
-          <p>Higher difficulty = more gold</p>
+        {/* Start Button */}
+        <div className="text-center">
+          <button
+            onClick={startBattle}
+            data-testid="button-start-battle"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-black py-4 px-12 rounded-xl text-xl transition-all transform hover:scale-105 shadow-lg flex items-center gap-3 mx-auto"
+          >
+            <Play className="w-6 h-6" />
+            START STAGE {nextStage}
+          </button>
         </div>
       </div>
+
+      {/* Reset Button - Bottom Left */}
+      <button
+        onClick={resetGame}
+        data-testid="button-reset"
+        className="absolute bottom-4 left-4 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded-lg px-3 py-2 flex items-center gap-2 shadow-lg text-sm font-bold"
+      >
+        <RefreshCw className="w-4 h-4" />
+        RESET
+      </button>
     </div>
   );
 }
