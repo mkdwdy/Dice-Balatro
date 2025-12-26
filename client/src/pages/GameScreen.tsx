@@ -165,6 +165,7 @@ export default function GameScreen() {
   const chargeStartRef = useRef<number>(0);
   const chargeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const MAX_CHARGE_TIME = 1500;
+  const pendingRollRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (match && params?.id) {
@@ -240,25 +241,29 @@ export default function GameScreen() {
     setRollPower(finalPower);
     
     setRolling(true);
+    pendingRollRef.current = true;
     const updatedDices = dices.map(d => d.locked ? d : { ...d, locked: false });
     setDices(updatedDices);
+  }, [isCharging, game, chargePower, dices]);
 
+  const handleDiceValuesDetected = useCallback(async (detectedValues: Record<number, number>) => {
+    if (!game || !pendingRollRef.current) return;
+    pendingRollRef.current = false;
+    
     try {
       const response = await fetch(`/api/games/${game.id}/roll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ detectedValues }),
       });
       const updatedGame = await response.json();
-      
-      setTimeout(() => {
-        setGame(updatedGame);
-        setRolling(false);
-      }, 1000);
+      setGame(updatedGame);
+      setRolling(false);
     } catch (error) {
       console.error('Failed to roll dices:', error);
       setRolling(false);
     }
-  }, [isCharging, game, chargePower, dices]);
+  }, [game]);
 
   useEffect(() => {
     return () => {
@@ -380,7 +385,7 @@ export default function GameScreen() {
 
         {/* Center - 3D Dice Board */}
         <div className="lg:col-span-3 relative min-h-0">
-          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} power={rollPower} />
+          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} power={rollPower} onDiceValuesDetected={handleDiceValuesDetected} />
           
           {damageDealt && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none animate-in fade-in duration-300">

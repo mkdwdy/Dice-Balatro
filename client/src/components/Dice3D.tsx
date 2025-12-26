@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Physics, useBox, usePlane } from '@react-three/cannon';
 import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
@@ -38,9 +38,7 @@ function createDiceFaceTexture(value: number, suit: string) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   
-  if (value > 0) {
-    ctx.fillText(value.toString(), 128, 128);
-  }
+  ctx.fillText(value.toString(), 128, 128);
 
   if (suit !== 'None') {
     ctx.font = '60px sans-serif';
@@ -51,16 +49,22 @@ function createDiceFaceTexture(value: number, suit: string) {
 }
 
 interface DiceProps {
+  id: number;
   position: [number, number, number];
-  value: number;
   suit: string;
   isLocked: boolean;
   onLockToggle: () => void;
   rolling: boolean;
   power: number;
+  onValueDetected: (id: number, value: number) => void;
 }
 
-function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }: DiceProps) {
+function Dice({ id, position, suit, isLocked, onLockToggle, rolling, power, onValueDetected }: DiceProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [hasReportedValue, setHasReportedValue] = useState(false);
+  const lastVelocityRef = useRef<number>(0);
+  const stableFramesRef = useRef<number>(0);
+  
   const [ref, api] = useBox(() => ({
     mass: 1.5,
     position,
@@ -68,10 +72,31 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }:
     material: { friction: 0.1, restitution: 0.6 },
   }));
 
-  const texture = useMemo(() => createDiceFaceTexture(value, suit), [value, suit]);
+  const textures = useMemo(() => {
+    return [
+      createDiceFaceTexture(2, suit),
+      createDiceFaceTexture(5, suit),
+      createDiceFaceTexture(3, suit),
+      createDiceFaceTexture(4, suit),
+      createDiceFaceTexture(1, suit),
+      createDiceFaceTexture(6, suit),
+    ];
+  }, [suit]);
+
+  const materials = useMemo(() => {
+    return textures.map(texture => 
+      new THREE.MeshStandardMaterial({ 
+        map: texture, 
+        color: isLocked ? '#ffff00' : '#ffffff' 
+      })
+    );
+  }, [textures, isLocked]);
 
   useEffect(() => {
     if (rolling && !isLocked) {
+      setHasReportedValue(false);
+      stableFramesRef.current = 0;
+      
       const powerMultiplier = 0.5 + power * 1.5;
       
       api.velocity.set(0, 5 * powerMultiplier, 0);
@@ -97,21 +122,48 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }:
     if (isLocked) {
       api.velocity.set(0, 0, 0);
       api.angularVelocity.set(0, 0, 0);
+      return;
     }
+
+    if (!rolling || hasReportedValue) return;
+
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    api.velocity.subscribe((velocity) => {
+      const speed = Math.sqrt(velocity[0] ** 2 + velocity[1] ** 2 + velocity[2] ** 2);
+      
+      if (speed < 0.1 && lastVelocityRef.current < 0.1) {
+        stableFramesRef.current++;
+        
+        if (stableFramesRef.current > 30 && !hasReportedValue) {
+          const topFaceValue = getTopFaceValue(mesh);
+          onValueDetected(id, topFaceValue);
+          setHasReportedValue(true);
+        }
+      } else {
+        stableFramesRef.current = 0;
+      }
+      
+      lastVelocityRef.current = speed;
+    })();
   });
 
   return (
     <mesh
-      ref={ref as any}
+      ref={(node) => {
+        (ref as any).current = node;
+        meshRef.current = node as THREE.Mesh;
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onLockToggle();
       }}
       castShadow
       receiveShadow
+      material={materials}
     >
       <boxGeometry args={[1.5, 1.5, 1.5]} />
-      <meshStandardMaterial map={texture} color={isLocked ? '#ffff00' : '#ffffff'} />
       {isLocked && (
         <mesh position={[0, 1.5, 0]}>
           <boxGeometry args={[0.3, 0.3, 0.3]} />
@@ -120,6 +172,36 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }:
       )}
     </mesh>
   );
+}
+
+function getTopFaceValue(mesh: THREE.Mesh): number {
+  const rotation = mesh.rotation;
+  const matrix = new THREE.Matrix4().makeRotationFromEuler(rotation);
+  
+  const faces = [
+    { normal: new THREE.Vector3(1, 0, 0), value: 2 },
+    { normal: new THREE.Vector3(-1, 0, 0), value: 5 },
+    { normal: new THREE.Vector3(0, 1, 0), value: 3 },
+    { normal: new THREE.Vector3(0, -1, 0), value: 4 },
+    { normal: new THREE.Vector3(0, 0, 1), value: 1 },
+    { normal: new THREE.Vector3(0, 0, -1), value: 6 },
+  ];
+  
+  const up = new THREE.Vector3(0, 1, 0);
+  let maxDot = -Infinity;
+  let topValue = 1;
+  
+  for (const face of faces) {
+    const rotatedNormal = face.normal.clone().applyMatrix4(matrix);
+    const dot = rotatedNormal.dot(up);
+    
+    if (dot > maxDot) {
+      maxDot = dot;
+      topValue = face.value;
+    }
+  }
+  
+  return topValue;
 }
 
 function Plane() {
@@ -209,49 +291,85 @@ interface DiceBoardProps {
   onLockToggle: (id: number) => void;
   rolling: boolean;
   power?: number;
+  onDiceValuesDetected?: (values: Record<number, number>) => void;
 }
 
-export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: DiceBoardProps) {
+function DiceScene({ dices, onLockToggle, rolling, power = 1, onDiceValuesDetected }: DiceBoardProps) {
+  const detectedValuesRef = useRef<Record<number, number>>({});
+  const expectedDiceCountRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (rolling) {
+      detectedValuesRef.current = {};
+      const unlockedCount = dices.filter(d => !d.locked).length;
+      expectedDiceCountRef.current = unlockedCount;
+    }
+  }, [rolling, dices]);
+
+  const handleValueDetected = useCallback((id: number, value: number) => {
+    detectedValuesRef.current[id] = value;
+    
+    const detectedCount = Object.keys(detectedValuesRef.current).length;
+    if (detectedCount >= expectedDiceCountRef.current && onDiceValuesDetected) {
+      onDiceValuesDetected({ ...detectedValuesRef.current });
+    }
+  }, [onDiceValuesDetected]);
+
+  return (
+    <>
+      <PerspectiveCamera makeDefault position={[0, 25, 1]} fov={35} onUpdate={c => c.lookAt(0, 0, 0)} />
+      
+      <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={0} maxPolarAngle={Math.PI / 2.5} />
+
+      <ambientLight intensity={1.5} />
+      <pointLight position={[10, 20, 10]} intensity={2} castShadow />
+      <directionalLight 
+        position={[0, 30, 0]} 
+        intensity={1.5} 
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-50}
+        shadow-camera-right={50}
+        shadow-camera-top={50}
+        shadow-camera-bottom={-50}
+        shadow-camera-near={0.1}
+        shadow-camera-far={100}
+      />
+
+      <Physics gravity={[0, -30, 0]}>
+        <Plane />
+        <DynamicWalls />
+
+        {dices.map((dice, i) => (
+          <Dice
+            key={dice.id}
+            id={dice.id}
+            position={[(i - 2) * 2.5, 6 + i, 0]} 
+            suit={dice.suit}
+            isLocked={dice.locked}
+            onLockToggle={() => onLockToggle(dice.id)}
+            rolling={rolling}
+            power={power}
+            onValueDetected={handleValueDetected}
+          />
+        ))}
+      </Physics>
+    </>
+  );
+}
+
+export default function DiceBoard({ dices, onLockToggle, rolling, power = 1, onDiceValuesDetected }: DiceBoardProps) {
   return (
     <div className="w-full h-full rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/80 relative">
       <Canvas shadows dpr={[1, 2]}>
-        <PerspectiveCamera makeDefault position={[0, 25, 1]} fov={35} onUpdate={c => c.lookAt(0, 0, 0)} />
-        
-        <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={0} maxPolarAngle={Math.PI / 2.5} />
-
-        <ambientLight intensity={1.5} />
-        <pointLight position={[10, 20, 10]} intensity={2} castShadow />
-        <directionalLight 
-          position={[0, 30, 0]} 
-          intensity={1.5} 
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-left={-50}
-          shadow-camera-right={50}
-          shadow-camera-top={50}
-          shadow-camera-bottom={-50}
-          shadow-camera-near={0.1}
-          shadow-camera-far={100}
+        <DiceScene 
+          dices={dices} 
+          onLockToggle={onLockToggle} 
+          rolling={rolling} 
+          power={power}
+          onDiceValuesDetected={onDiceValuesDetected}
         />
-
-        <Physics gravity={[0, -30, 0]}>
-          <Plane />
-          <DynamicWalls />
-
-          {dices.map((dice, i) => (
-            <Dice
-              key={dice.id}
-              position={[(i - 2) * 2.5, 6 + i, 0]} 
-              value={dice.value}
-              suit={dice.suit}
-              isLocked={dice.locked}
-              onLockToggle={() => onLockToggle(dice.id)}
-              rolling={rolling}
-              power={power}
-            />
-          ))}
-        </Physics>
       </Canvas>
       
       <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground pointer-events-none">
