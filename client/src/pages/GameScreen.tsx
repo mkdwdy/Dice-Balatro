@@ -158,7 +158,7 @@ export default function GameScreen() {
   const [dices, setDices] = useState<Dice[]>([]);
   const [damageDealt, setDamageDealt] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
-  const [waitingForNewRound, setWaitingForNewRound] = useState(false);
+  const [waitingForNewRound, setWaitingForNewRound] = useState(true);
   
   const [isCharging, setIsCharging] = useState(false);
   const [chargePower, setChargePower] = useState(0);
@@ -175,17 +175,13 @@ export default function GameScreen() {
 
   useEffect(() => {
     if (game) {
-      if (!rolling) {
-        setDices(game.dices as Dice[]);
-      }
-      
       if (game.gameState === 'shop') {
         setLocation(`/shop/${game.id}`);
       } else if (game.gameState === 'stage_select') {
         setLocation(`/stage-select/${game.id}`);
       }
     }
-  }, [game, rolling]);
+  }, [game]);
 
   const fetchGame = async (id: string) => {
     try {
