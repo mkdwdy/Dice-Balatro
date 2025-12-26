@@ -62,9 +62,9 @@ interface DiceProps {
 
 function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }: DiceProps) {
   const [ref, api] = useBox(() => ({
-    mass: 1,
+    mass: 3,
     position,
-    args: [1, 1, 1],
+    args: [3, 3, 3],
     material: { friction: 0.1, restitution: 0.5 },
   }));
 
@@ -110,11 +110,11 @@ function Dice({ position, value, suit, isLocked, onLockToggle, rolling, power }:
       castShadow
       receiveShadow
     >
-      <boxGeometry args={[1, 1, 1]} />
+      <boxGeometry args={[3, 3, 3]} />
       <meshStandardMaterial map={texture} color={isLocked ? '#ffff00' : '#ffffff'} />
       {isLocked && (
-        <mesh position={[0, 1.2, 0]}>
-          <boxGeometry args={[0.2, 0.2, 0.2]} />
+        <mesh position={[0, 2.5, 0]}>
+          <boxGeometry args={[0.5, 0.5, 0.5]} />
           <meshBasicMaterial color="yellow" />
         </mesh>
       )}
@@ -221,7 +221,19 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: D
 
         <ambientLight intensity={1.5} />
         <pointLight position={[10, 20, 10]} intensity={2} castShadow />
-        <directionalLight position={[0, 20, 0]} intensity={1.5} castShadow />
+        <directionalLight 
+          position={[0, 30, 0]} 
+          intensity={1.5} 
+          castShadow
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+          shadow-camera-left={-50}
+          shadow-camera-right={50}
+          shadow-camera-top={50}
+          shadow-camera-bottom={-50}
+          shadow-camera-near={0.1}
+          shadow-camera-far={100}
+        />
 
         <Physics gravity={[0, -30, 0]}>
           <Plane />
@@ -230,7 +242,7 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: D
           {dices.map((dice, i) => (
             <Dice
               key={dice.id}
-              position={[(i - 2) * 1.5, 5 + i, 0]} 
+              position={[(i - 2) * 4.5, 8 + i * 2, 0]} 
               value={dice.value}
               suit={dice.suit}
               isLocked={dice.locked}
