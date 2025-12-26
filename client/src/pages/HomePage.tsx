@@ -22,39 +22,39 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
-      <div className="max-w-2xl w-full text-center space-y-8">
+    <div className="h-screen bg-background text-foreground flex items-center justify-center p-4 overflow-hidden">
+      <div className="max-w-xl w-full text-center space-y-6">
         {/* Title */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <Dices className="w-16 h-16 text-primary" />
-            <h1 className="text-6xl font-black text-primary tracking-tight">
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Dices className="w-12 h-12 text-primary" />
+            <h1 className="text-4xl sm:text-5xl font-black text-primary tracking-tight">
               YAHTZEE<br/>BALATRO
             </h1>
-            <Trophy className="w-16 h-16 text-accent" />
+            <Trophy className="w-12 h-12 text-accent" />
           </div>
-          <p className="text-xl text-muted-foreground max-w-lg mx-auto">
+          <p className="text-lg text-muted-foreground max-w-md mx-auto">
             Roll dice, build combos, defeat enemies.<br/>
             Yahtzee meets deck-building roguelike.
           </p>
         </div>
 
         {/* Features */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
-          <div className="bg-card border border-card-border rounded-lg p-6">
-            <div className="text-4xl mb-2">🎲</div>
-            <h3 className="font-bold mb-1">Physics Dice</h3>
-            <p className="text-sm text-muted-foreground">3D dice with real physics</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card border border-card-border rounded-lg p-4">
+            <div className="text-3xl mb-1">🎲</div>
+            <h3 className="font-bold text-sm">Physics Dice</h3>
+            <p className="text-xs text-muted-foreground">3D real physics</p>
           </div>
-          <div className="bg-card border border-card-border rounded-lg p-6">
-            <div className="text-4xl mb-2">🃏</div>
-            <h3 className="font-bold mb-1">Build Your Deck</h3>
-            <p className="text-sm text-muted-foreground">Collect jokers & upgrades</p>
+          <div className="bg-card border border-card-border rounded-lg p-4">
+            <div className="text-3xl mb-1">🃏</div>
+            <h3 className="font-bold text-sm">Build Deck</h3>
+            <p className="text-xs text-muted-foreground">Collect upgrades</p>
           </div>
-          <div className="bg-card border border-card-border rounded-lg p-6">
-            <div className="text-4xl mb-2">⚔️</div>
-            <h3 className="font-bold mb-1">Strategic Combat</h3>
-            <p className="text-sm text-muted-foreground">Choose your battles wisely</p>
+          <div className="bg-card border border-card-border rounded-lg p-4">
+            <div className="text-3xl mb-1">⚔️</div>
+            <h3 className="font-bold text-sm">Combat</h3>
+            <p className="text-xs text-muted-foreground">Strategic battles</p>
           </div>
         </div>
 
@@ -63,23 +63,23 @@ export default function HomePage() {
           onClick={startNewGame}
           disabled={loading}
           data-testid="button-start-game"
-          className="bg-primary hover:bg-primary/90 disabled:bg-muted text-primary-foreground font-black text-2xl py-6 px-12 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:scale-100 flex items-center justify-center gap-3 mx-auto shadow-lg"
+          className="bg-primary hover:bg-primary/90 disabled:bg-muted text-primary-foreground font-black text-xl py-4 px-10 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:scale-100 flex items-center justify-center gap-3 mx-auto shadow-lg"
         >
           {loading ? (
             <>
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-foreground" />
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground" />
               Loading...
             </>
           ) : (
             <>
-              <Sparkles className="w-8 h-8" />
+              <Sparkles className="w-6 h-6" />
               START NEW GAME
             </>
           )}
         </button>
 
         {/* Footer */}
-        <div className="text-xs text-muted-foreground mt-12">
+        <div className="text-xs text-muted-foreground">
           <p>Lock dice for better combos • Higher stakes = bigger rewards</p>
         </div>
       </div>

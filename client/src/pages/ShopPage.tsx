@@ -71,7 +71,7 @@ export default function ShopPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading shop...</p>
@@ -82,7 +82,7 @@ export default function ShopPage() {
 
   if (!game) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
         <div className="text-center">
           <p className="text-destructive text-lg">Game not found</p>
         </div>
@@ -91,50 +91,49 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
+    <div className="h-screen bg-background text-foreground p-4 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="max-w-6xl mx-auto mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <ShoppingBag className="w-12 h-12 text-primary" />
+      <div className="flex-shrink-0 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShoppingBag className="w-8 h-8 text-primary" />
             <div>
-              <h1 className="text-4xl font-black text-primary">SHOP</h1>
-              <p className="text-sm text-muted-foreground">Stage {game.currentStage}-{game.currentRound}</p>
+              <h1 className="text-3xl font-black text-primary">SHOP</h1>
+              <p className="text-xs text-muted-foreground">Stage {game.currentStage}-{game.currentRound}</p>
             </div>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="bg-card border border-card-border rounded-lg px-6 py-3">
-              <div className="flex items-center gap-2">
-                <Crown className="w-5 h-5 text-primary" />
-                <span className="text-2xl font-black text-primary">${game.gold}</span>
-              </div>
+          <div className="bg-card border border-card-border rounded-lg px-4 py-2">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-primary" />
+              <span className="text-xl font-black text-primary">${game.gold}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      {/* Shop Items - Scrollable if needed */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0 overflow-auto">
         {/* Jokers */}
-        <div>
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Jokers (Permanent Upgrades)
+        <div className="flex flex-col">
+          <h2 className="text-lg font-bold mb-2 flex items-center gap-2 flex-shrink-0">
+            <Sparkles className="w-4 h-4 text-primary" />
+            Jokers (Permanent)
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-2 flex-1">
             {SHOP_ITEMS.jokers.map((joker) => (
               <div
                 key={joker.id}
-                className="bg-card border border-card-border rounded-lg p-4 flex items-center justify-between"
+                className="bg-card border border-card-border rounded-lg p-3 flex items-center justify-between"
               >
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg mb-1">{joker.name}</h3>
-                  <p className="text-sm text-muted-foreground">{joker.description}</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm truncate">{joker.name}</h3>
+                  <p className="text-xs text-muted-foreground truncate">{joker.description}</p>
                 </div>
                 <button
                   onClick={() => buyItem('joker', joker)}
                   disabled={game.gold < joker.cost}
                   data-testid={`button-buy-${joker.id}`}
-                  className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-bold px-6 py-2 rounded-lg transition-colors ml-4"
+                  className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-bold px-4 py-1 rounded-lg transition-colors ml-2 text-sm flex-shrink-0"
                 >
                   ${joker.cost}
                 </button>
@@ -144,26 +143,26 @@ export default function ShopPage() {
         </div>
 
         {/* Consumables */}
-        <div>
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-accent" />
-            Consumables (One-Time Use)
+        <div className="flex flex-col">
+          <h2 className="text-lg font-bold mb-2 flex items-center gap-2 flex-shrink-0">
+            <ShoppingBag className="w-4 h-4 text-accent" />
+            Consumables (One-Time)
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-2 flex-1">
             {SHOP_ITEMS.consumables.map((consumable) => (
               <div
                 key={consumable.id}
-                className="bg-card border border-card-border rounded-lg p-4 flex items-center justify-between"
+                className="bg-card border border-card-border rounded-lg p-3 flex items-center justify-between"
               >
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg mb-1">{consumable.name}</h3>
-                  <p className="text-sm text-muted-foreground">{consumable.description}</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm truncate">{consumable.name}</h3>
+                  <p className="text-xs text-muted-foreground truncate">{consumable.description}</p>
                 </div>
                 <button
                   onClick={() => buyItem('consumable', consumable)}
                   disabled={game.gold < consumable.cost}
                   data-testid={`button-buy-${consumable.id}`}
-                  className="bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-bold px-6 py-2 rounded-lg transition-colors ml-4"
+                  className="bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-bold px-4 py-1 rounded-lg transition-colors ml-2 text-sm flex-shrink-0"
                 >
                   ${consumable.cost}
                 </button>
@@ -174,14 +173,14 @@ export default function ShopPage() {
       </div>
 
       {/* Exit Button */}
-      <div className="max-w-6xl mx-auto">
+      <div className="flex-shrink-0 mt-4">
         <button
           onClick={exitShop}
           data-testid="button-exit-shop"
-          className="bg-accent hover:bg-accent/90 text-accent-foreground font-black text-xl py-4 px-8 rounded-lg transition-all duration-200 flex items-center gap-3 mx-auto"
+          className="bg-accent hover:bg-accent/90 text-accent-foreground font-black text-lg py-3 px-6 rounded-lg transition-all duration-200 flex items-center gap-2 mx-auto"
         >
-          Continue to Stage Selection
-          <ArrowRight className="w-6 h-6" />
+          Continue
+          <ArrowRight className="w-5 h-5" />
         </button>
       </div>
     </div>

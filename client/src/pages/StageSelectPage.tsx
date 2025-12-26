@@ -6,30 +6,30 @@ import type { GameSession } from '@shared/schema';
 const STAGE_OPTIONS = [
   { 
     id: 'easy', 
-    name: 'Easy Battle', 
+    name: 'Easy', 
     enemyHp: 800, 
     reward: 3,
     icon: Target,
     color: 'text-green-500',
-    description: 'Standard enemy • Low HP',
+    description: 'Low HP enemy',
   },
   { 
     id: 'medium', 
-    name: 'Medium Battle', 
+    name: 'Medium', 
     enemyHp: 1000, 
     reward: 5,
     icon: Swords,
     color: 'text-yellow-500',
-    description: 'Tougher enemy • Medium HP',
+    description: 'Medium HP enemy',
   },
   { 
     id: 'hard', 
-    name: 'Hard Battle', 
+    name: 'Hard', 
     enemyHp: 1200, 
     reward: 8,
     icon: Skull,
     color: 'text-red-500',
-    description: 'Elite enemy • High HP',
+    description: 'High HP enemy',
   },
   { 
     id: 'boss', 
@@ -38,7 +38,7 @@ const STAGE_OPTIONS = [
     reward: 15,
     icon: Crown,
     color: 'text-purple-500',
-    description: 'Boss fight • Extreme HP • Advances round',
+    description: 'Advance round',
   },
 ];
 
@@ -83,7 +83,7 @@ export default function StageSelectPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading stages...</p>
@@ -94,7 +94,7 @@ export default function StageSelectPage() {
 
   if (!game) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
         <div className="text-center">
           <p className="text-destructive text-lg">Game not found</p>
         </div>
@@ -103,26 +103,26 @@ export default function StageSelectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 flex items-center justify-center">
-      <div className="max-w-4xl w-full">
+    <div className="h-screen bg-background text-foreground p-4 flex flex-col items-center justify-center overflow-hidden">
+      <div className="max-w-3xl w-full">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-black text-primary mb-4">SELECT YOUR BATTLE</h1>
-          <p className="text-xl text-muted-foreground">Stage {game.currentStage}-{game.currentRound}</p>
-          <div className="flex items-center justify-center gap-8 mt-6">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl sm:text-4xl font-black text-primary mb-2">SELECT BATTLE</h1>
+          <p className="text-lg text-muted-foreground">Stage {game.currentStage}-{game.currentRound}</p>
+          <div className="flex items-center justify-center gap-6 mt-3">
             <div className="flex items-center gap-2">
-              <HeartIcon className="w-5 h-5 text-destructive" />
-              <span className="text-2xl font-bold">{game.health} HP</span>
+              <HeartIcon className="w-4 h-4 text-destructive" />
+              <span className="text-lg font-bold">{game.health} HP</span>
             </div>
             <div className="flex items-center gap-2">
-              <Crown className="w-5 h-5 text-primary" />
-              <span className="text-2xl font-bold">${game.gold}</span>
+              <Crown className="w-4 h-4 text-primary" />
+              <span className="text-lg font-bold">${game.gold}</span>
             </div>
           </div>
         </div>
 
         {/* Stage Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {STAGE_OPTIONS.map((stage) => {
             const Icon = stage.icon;
             return (
@@ -130,26 +130,22 @@ export default function StageSelectPage() {
                 key={stage.id}
                 onClick={() => selectStage(stage.id)}
                 data-testid={`button-stage-${stage.id}`}
-                className="bg-card border-2 border-card-border hover:border-primary rounded-xl p-8 transition-all duration-200 transform hover:scale-105 text-left"
+                className="bg-card border-2 border-card-border hover:border-primary rounded-xl p-4 transition-all duration-200 transform hover:scale-105 text-left"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Icon className={`w-10 h-10 ${stage.color}`} />
-                    <div>
-                      <h2 className="text-2xl font-black">{stage.name}</h2>
-                      <p className="text-sm text-muted-foreground">{stage.description}</p>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon className={`w-6 h-6 ${stage.color}`} />
+                  <h2 className="text-lg font-black">{stage.name}</h2>
                 </div>
+                <p className="text-xs text-muted-foreground mb-3">{stage.description}</p>
                 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-background/50 rounded-lg p-3">
-                    <span className="text-sm font-bold text-muted-foreground">Enemy HP:</span>
-                    <span className="text-xl font-black text-accent">{stage.enemyHp}</span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
+                    <span className="text-xs text-muted-foreground">HP:</span>
+                    <span className="text-sm font-black text-accent">{stage.enemyHp}</span>
                   </div>
-                  <div className="flex items-center justify-between bg-background/50 rounded-lg p-3">
-                    <span className="text-sm font-bold text-muted-foreground">Reward:</span>
-                    <span className="text-xl font-black text-primary">+${stage.reward}</span>
+                  <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
+                    <span className="text-xs text-muted-foreground">Reward:</span>
+                    <span className="text-sm font-black text-primary">+${stage.reward}</span>
                   </div>
                 </div>
               </button>
@@ -157,9 +153,9 @@ export default function StageSelectPage() {
           })}
         </div>
 
-        {/* Footer Hint */}
-        <div className="text-center text-sm text-muted-foreground mt-8">
-          <p>Higher difficulty = more gold • Boss fights advance to next round</p>
+        {/* Footer */}
+        <div className="text-center text-xs text-muted-foreground mt-4">
+          <p>Higher difficulty = more gold</p>
         </div>
       </div>
     </div>

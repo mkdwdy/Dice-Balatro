@@ -162,7 +162,7 @@ interface DiceBoardProps {
 
 export default function DiceBoard({ dices, onLockToggle, rolling }: DiceBoardProps) {
   return (
-    <div className="w-full h-[400px] rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/80 relative">
+    <div className="w-full h-full rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/80 relative">
       <Canvas shadows dpr={[1, 2]}>
         {/* 카메라 위치: 위에서 아래로 직각으로 내려다봄 */}
         <PerspectiveCamera makeDefault position={[0, 25, 1]} fov={35} onUpdate={c => c.lookAt(0, 0, 0)} />

@@ -267,7 +267,7 @@ export default function GameScreen() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading game...</p>
@@ -278,7 +278,7 @@ export default function GameScreen() {
 
   if (!game) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
         <div className="text-center">
           <p className="text-destructive text-lg">Game not found</p>
         </div>
@@ -287,22 +287,22 @@ export default function GameScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 font-sans">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="h-screen bg-background text-foreground p-4 font-sans flex flex-col overflow-hidden">
+      {/* Header - Enemy Info */}
+      <div className="flex-shrink-0 mb-3">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h1 className="text-3xl font-bold text-primary mb-2" data-testid="text-stage">
+            <h1 className="text-2xl font-bold text-primary" data-testid="text-stage">
               STAGE {game.currentStage}-{game.currentRound}
             </h1>
-            <p className="text-muted-foreground text-sm">숫자 6 무효</p>
           </div>
           <div className="text-right">
-            <div className="text-5xl font-black text-accent mb-2" data-testid="text-enemy-hp">{game.enemyHp}</div>
+            <div className="text-4xl font-black text-accent" data-testid="text-enemy-hp">{game.enemyHp}</div>
             <p className="text-muted-foreground text-xs">ENEMY HP</p>
           </div>
         </div>
         
-        <div className="h-3 bg-card border border-card-border rounded-full overflow-hidden">
+        <div className="h-2 bg-card border border-card-border rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
             style={{ width: `${Math.max(0, (game.enemyHp / game.maxEnemyHp) * 100)}%` }}
@@ -310,103 +310,104 @@ export default function GameScreen() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-6 h-[500px]">
-        <div className="space-y-4">
-          <div className="bg-card border border-card-border rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <RotateCcwIcon className="w-5 h-5 text-primary" />
+      {/* Main Content - Flexible height */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
+        {/* Left Panel - Stats */}
+        <div className="hidden lg:flex flex-col gap-3">
+          <div className="bg-card border border-card-border rounded-lg p-3 flex-1 flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-1">
+              <RotateCcwIcon className="w-4 h-4 text-primary" />
               <span className="text-xs font-bold text-muted-foreground uppercase">Rerolls</span>
             </div>
-            <div className="text-4xl font-black text-foreground" data-testid="text-rerolls">{game.rerollsLeft}</div>
+            <div className="text-3xl font-black text-foreground" data-testid="text-rerolls">{game.rerollsLeft}</div>
           </div>
 
-          <div className="bg-card border border-card-border rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Crown className="w-5 h-5 text-primary" />
+          <div className="bg-card border border-card-border rounded-lg p-3 flex-1 flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-1">
+              <Crown className="w-4 h-4 text-primary" />
               <span className="text-xs font-bold text-muted-foreground uppercase">Gold</span>
             </div>
-            <div className="text-4xl font-black text-primary" data-testid="text-gold">${game.gold}</div>
+            <div className="text-3xl font-black text-primary" data-testid="text-gold">${game.gold}</div>
           </div>
 
-          <div className="bg-card border border-card-border rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <HeartIcon className="w-5 h-5 text-destructive" />
+          <div className="bg-card border border-card-border rounded-lg p-3 flex-1 flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-1">
+              <HeartIcon className="w-4 h-4 text-destructive" />
               <span className="text-xs font-bold text-muted-foreground uppercase">Health</span>
             </div>
-            <div className="text-4xl font-black text-destructive" data-testid="text-health">{game.health}</div>
+            <div className="text-3xl font-black text-destructive" data-testid="text-health">{game.health}</div>
           </div>
         </div>
 
-        <div className="lg:col-span-2 relative">
+        {/* Center - 3D Dice Board */}
+        <div className="lg:col-span-3 relative min-h-0">
           <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} />
           
           {damageDealt && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none animate-in fade-in duration-300">
               <div className="text-center">
-                <div className="text-8xl font-black text-accent mb-2 drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]" data-testid="text-damage">{damageDealt}</div>
-                <p className="text-primary text-2xl font-bold uppercase tracking-widest">DAMAGE!</p>
+                <div className="text-7xl font-black text-accent mb-2 drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]" data-testid="text-damage">{damageDealt}</div>
+                <p className="text-primary text-xl font-bold uppercase tracking-widest">DAMAGE!</p>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-         <div className="col-span-2">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase mb-3">Locked Dices</h3>
-            <div className="flex gap-3">
+      {/* Bottom Panel - Controls */}
+      <div className="flex-shrink-0 mt-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Mobile Stats (hidden on desktop) */}
+          <div className="lg:hidden flex gap-2 justify-center">
+            <div className="bg-card border border-card-border rounded px-3 py-1 flex items-center gap-2">
+              <RotateCcwIcon className="w-4 h-4 text-primary" />
+              <span className="font-bold">{game.rerollsLeft}</span>
+            </div>
+            <div className="bg-card border border-card-border rounded px-3 py-1 flex items-center gap-2">
+              <Crown className="w-4 h-4 text-primary" />
+              <span className="font-bold">${game.gold}</span>
+            </div>
+            <div className="bg-card border border-card-border rounded px-3 py-1 flex items-center gap-2">
+              <HeartIcon className="w-4 h-4 text-destructive" />
+              <span className="font-bold">{game.health}</span>
+            </div>
+          </div>
+
+          {/* Locked Dices */}
+          <div className="md:col-span-2">
+            <div className="flex gap-2 justify-center md:justify-start">
               {dices.map(dice => (
                 <div
                   key={dice.id}
                   onClick={() => toggleLock(dice.id)}
                   data-testid={`dice-2d-${dice.id}`}
-                  className={`w-16 h-16 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all ${
                     dice.locked
                       ? 'bg-primary text-primary-foreground border-primary shadow-[0_0_10px_rgba(255,165,0,0.5)] scale-105'
                       : 'bg-card text-muted-foreground border-card-border opacity-50 hover:opacity-100'
                   }`}
                 >
-                  <span className="text-xl font-bold">{dice.value}</span>
-                  <span className="text-xs">{dice.suit}</span>
+                  <span className="text-lg font-bold">{dice.value}</span>
+                  <span className="text-[10px]">{dice.suit}</span>
                 </div>
               ))}
             </div>
-         </div>
-
-         <div className="space-y-4">
-          <div className="bg-card border-2 border-primary rounded-lg p-4">
-            <p className="text-xs font-bold text-muted-foreground uppercase mb-3">Current Hand</p>
-            {selectedHand ? (
-              <>
-                <div className="text-2xl font-black text-primary mb-1" data-testid="text-hand-name">{selectedHand.name}</div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Dice Sum:</span>
-                    <span className="font-black text-foreground">{activeDicesSum}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Multiplier:</span>
-                    <span className="font-black text-primary">x{selectedHand.multiplier + 1}</span>
-                  </div>
-                  <div className="pt-2 border-t border-card-border">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-muted-foreground">Damage:</span>
-                      <span className="text-lg font-black text-accent" data-testid="text-calculated-damage">{calculateScore()}</span>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-xs text-muted-foreground">Lock dice to see hand</div>
-            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Hand Info & Actions */}
+          <div className="flex gap-2 items-center justify-center md:justify-end">
+            {selectedHand && (
+              <div className="bg-card border border-primary rounded-lg px-3 py-2 text-center">
+                <div className="text-sm font-black text-primary" data-testid="text-hand-name">{selectedHand.name}</div>
+                <div className="text-lg font-black text-accent" data-testid="text-calculated-damage">{calculateScore()} DMG</div>
+              </div>
+            )}
+
             <button
               onClick={rollDices}
               disabled={game.rerollsLeft === 0 || rolling}
               data-testid="button-reroll"
-              className="bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-black py-3 rounded-lg transition-colors duration-200"
+              className="bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-black py-2 px-4 rounded-lg transition-colors"
             >
               REROLL
             </button>
@@ -415,17 +416,13 @@ export default function GameScreen() {
               onClick={submitHand}
               disabled={!selectedHand || damageDealt !== null || rolling}
               data-testid="button-submit"
-              className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-3 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+              className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-2 px-4 rounded-lg transition-colors flex items-center gap-1"
             >
-              <CheckCircleIcon className="w-5 h-5" />
+              <CheckCircleIcon className="w-4 h-4" />
               SUBMIT
             </button>
           </div>
-         </div>
-      </div>
-
-      <div className="text-center text-muted-foreground text-xs mt-8">
-        <p>Click 3D dice or 2D icons to lock • REROLL to shake board</p>
+        </div>
       </div>
     </div>
   );
