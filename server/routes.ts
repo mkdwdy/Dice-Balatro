@@ -134,12 +134,18 @@ export async function registerRoutes(
       
       const currentDices = session.dices as Dice[];
       
-      const newDices = currentDices.map(d => {
-        if (lockedMap[d.id] !== undefined) {
-          return { ...d, value: lockedMap[d.id].value, locked: true };
-        }
-        return { ...d, locked: false };
-      });
+      // 주사위가 비어있으면 새로 생성
+      let newDices: Dice[];
+      if (currentDices.length === 0) {
+        newDices = createInitialDices();
+      } else {
+        newDices = currentDices.map(d => {
+          if (lockedMap[d.id] !== undefined) {
+            return { ...d, value: lockedMap[d.id].value, locked: true };
+          }
+          return { ...d, locked: false };
+        });
+      }
 
       const updatedSession = await storage.updateGameSession(req.params.id, {
         dices: newDices as any,
