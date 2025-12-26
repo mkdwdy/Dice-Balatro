@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Physics, useBox, usePlane } from '@react-three/cannon';
-import { Text, PerspectiveCamera, OrbitControls } from '@react-three/drei';
+import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 const SUIT_COLORS: Record<string, string> = {
@@ -136,6 +136,61 @@ function Plane() {
   );
 }
 
+function Ceiling({ height }: { height: number }) {
+  const [ref] = usePlane(() => ({
+    rotation: [Math.PI / 2, 0, 0],
+    position: [0, height, 0],
+    material: { restitution: 0.9 }
+  }));
+  return <mesh ref={ref as any} visible={false} />;
+}
+
+function DynamicWalls() {
+  const { camera, size } = useThree();
+  
+  const bounds = useMemo(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    const fovRad = (cam.fov * Math.PI) / 180;
+    const cameraHeight = cam.position.y;
+    
+    const visibleHeight = 2 * Math.tan(fovRad / 2) * cameraHeight;
+    const visibleWidth = visibleHeight * (size.width / size.height);
+    
+    const halfWidth = visibleWidth / 2 * 0.9;
+    const halfDepth = visibleHeight / 2 * 0.9;
+    const wallHeight = 50;
+    const ceilingHeight = 30;
+    
+    return { halfWidth, halfDepth, wallHeight, ceilingHeight };
+  }, [camera, size.width, size.height]);
+
+  return (
+    <>
+      <Ceiling height={bounds.ceilingHeight} />
+      <Wall 
+        key={`back-${bounds.halfDepth}`}
+        position={[0, bounds.wallHeight / 2, -bounds.halfDepth]} 
+        args={[bounds.halfWidth * 2 + 2, bounds.wallHeight, 1]} 
+      />
+      <Wall 
+        key={`front-${bounds.halfDepth}`}
+        position={[0, bounds.wallHeight / 2, bounds.halfDepth]} 
+        args={[bounds.halfWidth * 2 + 2, bounds.wallHeight, 1]} 
+      />
+      <Wall 
+        key={`left-${bounds.halfWidth}`}
+        position={[-bounds.halfWidth, bounds.wallHeight / 2, 0]} 
+        args={[1, bounds.wallHeight, bounds.halfDepth * 2 + 2]} 
+      />
+      <Wall 
+        key={`right-${bounds.halfWidth}`}
+        position={[bounds.halfWidth, bounds.wallHeight / 2, 0]} 
+        args={[1, bounds.wallHeight, bounds.halfDepth * 2 + 2]} 
+      />
+    </>
+  );
+}
+
 function Wall({ position, args }: { position: [number, number, number], args: [number, number, number] }) {
   const [ref] = useBox(() => ({ 
     position, 
@@ -147,15 +202,6 @@ function Wall({ position, args }: { position: [number, number, number], args: [n
       <boxGeometry args={args} />
     </mesh>
   );
-}
-
-function Ceiling() {
-  const [ref] = usePlane(() => ({
-    rotation: [Math.PI / 2, 0, 0],
-    position: [0, 25, 0],
-    material: { restitution: 0.9 }
-  }));
-  return <mesh ref={ref as any} visible={false} />;
 }
 
 interface DiceBoardProps {
@@ -179,11 +225,7 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1 }: D
 
         <Physics gravity={[0, -30, 0]}>
           <Plane />
-          <Ceiling />
-          <Wall position={[0, 15, -10]} args={[22, 40, 1]} />
-          <Wall position={[0, 15, 10]} args={[22, 40, 1]} />
-          <Wall position={[-11, 15, 0]} args={[1, 40, 22]} />
-          <Wall position={[11, 15, 0]} args={[1, 40, 22]} />
+          <DynamicWalls />
 
           {dices.map((dice, i) => (
             <Dice
