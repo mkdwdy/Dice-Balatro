@@ -107,6 +107,11 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
   }, [textures, isLocked]);
 
   useEffect(() => {
+    const rotation = VALUE_TO_ROTATION[value] || [0, 0, 0];
+    api.rotation.set(rotation[0], rotation[1], rotation[2]);
+  }, [value, api]);
+
+  useEffect(() => {
     if (rolling && !isLocked) {
       setHasReportedValue(false);
       stableFramesRef.current = 0;
