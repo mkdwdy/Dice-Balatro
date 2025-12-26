@@ -51,6 +51,7 @@ function createDiceFaceTexture(value: number, suit: string) {
 interface DiceProps {
   id: number;
   position: [number, number, number];
+  value: number;
   suit: string;
   isLocked: boolean;
   onLockToggle: () => void;
@@ -59,17 +60,32 @@ interface DiceProps {
   onValueDetected: (id: number, value: number) => void;
 }
 
-function Dice({ id, position, suit, isLocked, onLockToggle, rolling, power, onValueDetected }: DiceProps) {
+const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
+  1: [Math.PI / 2, 0, 0],
+  2: [0, 0, Math.PI / 2],
+  3: [0, 0, 0],
+  4: [Math.PI, 0, 0],
+  5: [0, 0, -Math.PI / 2],
+  6: [-Math.PI / 2, 0, 0],
+};
+
+function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power, onValueDetected }: DiceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hasReportedValue, setHasReportedValue] = useState(false);
   const lastVelocityRef = useRef<number>(0);
   const stableFramesRef = useRef<number>(0);
   
+  const initialRotation: [number, number, number] = isLocked 
+    ? (VALUE_TO_ROTATION[value] || [0, 0, 0]) 
+    : [0, 0, 0];
+  
   const [ref, api] = useBox(() => ({
-    mass: 1.5,
+    mass: isLocked ? 0 : 1.5,
     position,
+    rotation: initialRotation,
     args: [1.5, 1.5, 1.5],
     material: { friction: 0.1, restitution: 0.6 },
+    type: isLocked ? 'Static' : 'Dynamic',
   }));
 
   const textures = useMemo(() => {
@@ -346,6 +362,7 @@ function DiceScene({ dices, onLockToggle, rolling, power = 1, onDiceValuesDetect
             key={dice.id}
             id={dice.id}
             position={[(i - 2) * 2.5, 6 + i, 0]} 
+            value={dice.value}
             suit={dice.suit}
             isLocked={dice.locked}
             onLockToggle={() => onLockToggle(dice.id)}
