@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Dices, Crown, HeartIcon, RotateCcwIcon, CheckCircleIcon } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown } from 'lucide-react';
 
 interface Dice {
   id: number;
@@ -15,17 +15,91 @@ interface HandType {
 }
 
 const HAND_TYPES: HandType[] = [
-  { name: 'High Dice', multiplier: 0, condition: '1 highest dice' },
-  { name: 'Straight 3', multiplier: 1, condition: '3 numbers in a row' },
-  { name: 'Straight 4', multiplier: 2, condition: '4 numbers in a row' },
-  { name: 'Straight 5', multiplier: 4, condition: '5 numbers in a row' },
-  { name: 'Pair', multiplier: 1, condition: 'Same 2 numbers' },
-  { name: 'Two Pair', multiplier: 2, condition: 'Same 2 numbers x2' },
-  { name: 'Triple', multiplier: 3, condition: 'Same 3 numbers' },
-  { name: 'Full House', multiplier: 4, condition: 'Triple + Pair' },
-  { name: 'Four of a Kind', multiplier: 5, condition: 'Same 4 numbers' },
   { name: 'Yahtzee', multiplier: 30, condition: 'Same 5 numbers' },
+  { name: 'Straight Flush', multiplier: 50, condition: '5 in a row + same suit' },
+  { name: 'Four of a Kind', multiplier: 5, condition: 'Same 4 numbers' },
+  { name: 'Full House', multiplier: 4, condition: 'Triple + Pair' },
+  { name: 'Flush', multiplier: 10, condition: '5 same suits' },
+  { name: 'Straight 5', multiplier: 4, condition: '5 numbers in a row' },
+  { name: 'Triple', multiplier: 3, condition: 'Same 3 numbers' },
+  { name: 'Two Pair', multiplier: 2, condition: 'Same 2 numbers x2' },
+  { name: 'Straight 4', multiplier: 2, condition: '4 numbers in a row' },
+  { name: 'Pair', multiplier: 1, condition: 'Same 2 numbers' },
+  { name: 'Straight 3', multiplier: 1, condition: '3 numbers in a row' },
+  { name: 'High Dice', multiplier: 0, condition: '1 highest dice' },
 ];
+
+// 유틸리티 함수들
+function countValues(values: number[]): Record<number, number> {
+  return values.reduce((acc, v) => ({ ...acc, [v]: ((acc as Record<number, number>)[v] || 0) + 1 }), {} as Record<number, number>);
+}
+
+function checkStraight(values: number[], length: number): boolean {
+  if (values.length < length) return false;
+  const uniqueValues = Array.from(new Set(values)).sort((a, b) => a - b);
+  for (let i = 0; i <= uniqueValues.length - length; i++) {
+    let isStraight = true;
+    for (let j = 0; j < length - 1; j++) {
+      if (uniqueValues[i + j + 1] - uniqueValues[i + j] !== 1) {
+        isStraight = false;
+        break;
+      }
+    }
+    if (isStraight) return true;
+  }
+  return false;
+}
+
+// 핸드 검증 함수들
+const handChecks: Record<string, (dices: Dice[]) => boolean> = {
+  'Yahtzee': (dices: Dice[]) => {
+    const values = dices.map(d => d.value);
+    return values.length === 5 && Array.from(new Set(values)).length === 1;
+  },
+  'Straight Flush': (dices: Dice[]) => {
+    const values = dices.map(d => d.value);
+    const suits = dices.map(d => d.suit);
+    return Array.from(new Set(suits)).length === 1 && checkStraight(values, 5);
+  },
+  'Four of a Kind': (dices: Dice[]) => {
+    const counts = countValues(dices.map(d => d.value));
+    return Object.values(counts).some(c => c >= 4);
+  },
+  'Full House': (dices: Dice[]) => {
+    const counts = countValues(dices.map(d => d.value));
+    const sorted = Object.values(counts).sort((a, b) => b - a);
+    return sorted.length >= 2 && sorted[0] >= 3 && sorted[1] >= 2;
+  },
+  'Flush': (dices: Dice[]) => {
+    const suits = dices.map(d => d.suit);
+    return dices.length >= 5 && Array.from(new Set(suits)).length === 1;
+  },
+  'Straight 5': (dices: Dice[]) => {
+    return checkStraight(dices.map(d => d.value), 5);
+  },
+  'Triple': (dices: Dice[]) => {
+    const counts = countValues(dices.map(d => d.value));
+    return Object.values(counts).some(c => c >= 3);
+  },
+  'Two Pair': (dices: Dice[]) => {
+    const counts = countValues(dices.map(d => d.value));
+    const pairs = Object.values(counts).filter(c => c >= 2);
+    return pairs.length >= 2;
+  },
+  'Straight 4': (dices: Dice[]) => {
+    return checkStraight(dices.map(d => d.value), 4);
+  },
+  'Pair': (dices: Dice[]) => {
+    const counts = countValues(dices.map(d => d.value));
+    return Object.values(counts).some(c => c >= 2);
+  },
+  'Straight 3': (dices: Dice[]) => {
+    return checkStraight(dices.map(d => d.value), 3);
+  },
+  'High Dice': (dices: Dice[]) => {
+    return dices.length > 0;
+  },
+};
 
 export default function GameScreen() {
   const [dices, setDices] = useState<Dice[]>(
@@ -40,10 +114,22 @@ export default function GameScreen() {
   const [rerollsLeft, setRerollsLeft] = useState(3);
   const [gold, setGold] = useState(8);
   const [health, setHealth] = useState(3);
-  const [selectedHand, setSelectedHand] = useState<HandType | null>(null);
   const [gameScore, setGameScore] = useState(0);
   const [enemyHp, setEnemyHp] = useState(800);
   const [damageDealt, setDamageDealt] = useState<number | null>(null);
+
+  // 자동 핸드 선택 로직
+  const selectedHand = useMemo(() => {
+    const lockedDices = dices.filter(d => d.locked);
+    if (lockedDices.length === 0) return null;
+
+    for (const handType of HAND_TYPES) {
+      if (handChecks[handType.name as keyof typeof handChecks]?.(lockedDices)) {
+        return handType;
+      }
+    }
+    return null;
+  }, [dices]);
 
   const toggleLock = (id: number) => {
     setDices(dices.map(d => d.id === id ? { ...d, locked: !d.locked } : d));
@@ -67,7 +153,8 @@ export default function GameScreen() {
   };
 
   const calculateScore = () => {
-    const sum = dices.reduce((acc, d) => acc + d.value, 0);
+    const lockedDices = dices.filter(d => d.locked);
+    const sum = lockedDices.reduce((acc, d) => acc + d.value, 0);
     const multiplier = selectedHand?.multiplier || 0;
     return sum * (multiplier + 1);
   };
@@ -89,11 +176,12 @@ export default function GameScreen() {
           }))
         );
         setRerollsLeft(3);
-        setSelectedHand(null);
         setDamageDealt(null);
       }, 1500);
     }
   };
+
+  const lockedCount = dices.filter(d => d.locked).length;
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6 font-sans">
@@ -206,14 +294,27 @@ export default function GameScreen() {
 
         {/* Right Panel - Current Score & Actions */}
         <div className="space-y-4">
-          {/* Score */}
+          {/* Locked Count */}
           <div className="bg-card border border-card-border rounded-lg p-4">
-            <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Your Score</p>
-            <div className="text-4xl font-black text-primary mb-3">{gameScore}</div>
-            {selectedHand && (
-              <div className="text-xs text-muted-foreground">
-                {selectedHand.name} x{selectedHand.multiplier + 1}
-              </div>
+            <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Locked</p>
+            <div className="text-4xl font-black text-primary mb-3">{lockedCount}/5</div>
+          </div>
+
+          {/* Auto-Selected Hand */}
+          <div className="bg-card border-2 border-primary rounded-lg p-4">
+            <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Current Hand</p>
+            {selectedHand ? (
+              <>
+                <div className="text-2xl font-black text-primary mb-2">{selectedHand.name}</div>
+                <div className="text-xs text-muted-foreground mb-3">
+                  x{selectedHand.multiplier + 1} multiplier
+                </div>
+                <div className="text-sm font-bold text-accent">
+                  Damage: {calculateScore()}
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-muted-foreground">Lock dice to see hand</div>
             )}
           </div>
 
@@ -224,7 +325,7 @@ export default function GameScreen() {
             data-testid="button-reroll"
             className="w-full bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-black py-3 rounded-lg transition-colors duration-200"
           >
-            REROLL
+            REROLL ({rerollsLeft})
           </button>
 
           {/* Submit Button */}
@@ -240,31 +341,9 @@ export default function GameScreen() {
         </div>
       </div>
 
-      {/* Hand Selection */}
-      <div className="mb-8">
-        <h2 className="text-sm font-black text-muted-foreground uppercase mb-4">Select Hand</h2>
-        <div className="grid grid-cols-5 gap-2">
-          {HAND_TYPES.map(hand => (
-            <button
-              key={hand.name}
-              onClick={() => setSelectedHand(hand)}
-              data-testid={`hand-${hand.name.toLowerCase().replace(/\s+/g, '-')}`}
-              className={`p-2 rounded-lg border-2 transition-all duration-200 text-center ${
-                selectedHand?.name === hand.name
-                  ? 'bg-primary border-primary text-primary-foreground'
-                  : 'bg-card border-card-border text-foreground hover:border-primary'
-              }`}
-            >
-              <div className="text-xs font-bold">{hand.name}</div>
-              <div className="text-xs text-muted-foreground">x{hand.multiplier + 1}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Footer */}
       <div className="text-center text-muted-foreground text-xs">
-        <p>Click dices to lock • Select a hand and click SUBMIT</p>
+        <p>Lock dice to auto-select the best hand • Click SUBMIT to attack</p>
       </div>
     </div>
   );
