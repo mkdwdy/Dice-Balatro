@@ -122,12 +122,6 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
     );
   }, [textures, isLocked]);
 
-  useEffect(() => {
-    if (isLocked) {
-      const rotation = VALUE_TO_ROTATION[value] || [0, 0, 0];
-      api.rotation.set(rotation[0], rotation[1], rotation[2]);
-    }
-  }, [value, api, isLocked]);
 
   useEffect(() => {
     if (rolling && !isLocked) {
