@@ -174,7 +174,9 @@ export default function GameScreen() {
 
   useEffect(() => {
     if (game) {
-      setDices(game.dices as Dice[]);
+      if (!rolling) {
+        setDices(game.dices as Dice[]);
+      }
       
       if (game.gameState === 'shop') {
         setLocation(`/shop/${game.id}`);
@@ -182,7 +184,7 @@ export default function GameScreen() {
         setLocation(`/stage-select/${game.id}`);
       }
     }
-  }, [game]);
+  }, [game, rolling]);
 
   const fetchGame = async (id: string) => {
     try {
@@ -246,6 +248,9 @@ export default function GameScreen() {
     
     setRolling(true);
     
+    const unlockedDices = dices.map(d => d.locked ? d : { ...d, locked: false });
+    setDices(unlockedDices);
+    
     try {
       const response = await fetch(`/api/games/${game.id}/roll`, {
         method: 'POST',
@@ -257,7 +262,7 @@ export default function GameScreen() {
       const updatedGame = await response.json();
       
       setTimeout(() => {
-        setGame(updatedGame);
+        setGame({ ...updatedGame, dices: unlockedDices });
         setRolling(false);
       }, 1500);
     } catch (error) {

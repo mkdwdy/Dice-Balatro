@@ -74,7 +74,7 @@ export async function registerRoutes(
     }
   });
 
-  // 주사위 굴리기 (클라이언트에서 락된 값 전달)
+  // 주사위 굴리기 (락된 주사위만 서버에 저장, 나머지는 물리 시뮬레이션)
   app.post('/api/games/:id/roll', async (req, res) => {
     try {
       const session = await storage.getGameSession(req.params.id);
@@ -87,10 +87,10 @@ export async function registerRoutes(
       }
 
       const { lockedDices } = req.body;
-      const lockedMap: Record<number, number> = {};
+      const lockedMap: Record<number, { value: number }> = {};
       if (lockedDices && Array.isArray(lockedDices)) {
         lockedDices.forEach((d: { id: number; value: number }) => {
-          lockedMap[d.id] = d.value;
+          lockedMap[d.id] = { value: d.value };
         });
       }
       
@@ -98,13 +98,9 @@ export async function registerRoutes(
       
       const newDices = currentDices.map(d => {
         if (lockedMap[d.id] !== undefined) {
-          return { ...d, value: lockedMap[d.id], locked: true };
+          return { ...d, value: lockedMap[d.id].value, locked: true };
         }
-        return { 
-          ...d, 
-          value: Math.floor(Math.random() * 6) + 1,
-          locked: false
-        };
+        return { ...d, locked: false };
       });
 
       const updatedSession = await storage.updateGameSession(req.params.id, {
