@@ -514,7 +514,7 @@ export default function GameScreen() {
                       )}
                       <span className="relative flex items-center gap-1">
                         {isCharging ? <Zap className="w-4 h-4 animate-pulse" /> : <RotateCcwIcon className="w-4 h-4" />}
-                        {isCharging ? `${Math.round(chargePower * 100)}%` : 'HOLD'}
+                        {isCharging ? `${Math.round(chargePower * 100)}%` : 'REROLL'}
                       </span>
                     </button>
                     {!isCharging && !rolling && game.rerollsLeft > 0 && (
