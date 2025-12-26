@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown } from 'lucide-react';
+import DiceBoard from '@/components/Dice3D';
 
 interface Dice {
   id: number;
@@ -101,12 +102,15 @@ const handChecks: Record<string, (dices: Dice[]) => boolean> = {
   },
 };
 
+// 고정된 수트 정의
+const FIXED_SUITS = ['None', '♠', '♦', '♥', '♣'];
+
 export default function GameScreen() {
   const [dices, setDices] = useState<Dice[]>(
     Array.from({ length: 5 }, (_, i) => ({
       id: i,
       value: Math.floor(Math.random() * 6) + 1,
-      suit: ['♠', '♥', '♦', '♣'][Math.floor(Math.random() * 4)],
+      suit: FIXED_SUITS[i],
       locked: false,
     }))
   );
@@ -117,6 +121,7 @@ export default function GameScreen() {
   const [gameScore, setGameScore] = useState(0);
   const [enemyHp, setEnemyHp] = useState(800);
   const [damageDealt, setDamageDealt] = useState<number | null>(null);
+  const [rolling, setRolling] = useState(false);
 
   // 족보에 사용되는 주사위 개수 반환 함수
   const getActiveDiceCount = (handName: string, lockedDices: Dice[]): number => {
@@ -224,24 +229,27 @@ export default function GameScreen() {
 
   const rollDices = () => {
     if (rerollsLeft > 0) {
-      setDices(
-        dices.map(d =>
-          d.locked
-            ? d
-            : {
-                ...d,
-                value: Math.floor(Math.random() * 6) + 1,
-                suit: ['♠', '♥', '♦', '♣'][Math.floor(Math.random() * 4)],
-              }
-        )
-      );
-      setRerollsLeft(rerollsLeft - 1);
+      setRolling(true);
+      setTimeout(() => {
+        setDices(
+          dices.map(d =>
+            d.locked
+              ? d
+              : {
+                  ...d,
+                  value: Math.floor(Math.random() * 6) + 1,
+                  // suit는 고정값이므로 변경하지 않음
+                }
+          )
+        );
+        setRolling(false);
+        setRerollsLeft(rerollsLeft - 1);
+      }, 1000);
     }
   };
 
   // 현재 표시용 정보
   const lockedDices = useMemo(() => dices.filter(d => d.locked), [dices]);
-  const lockedCount = lockedDices.length;
   const activeDicesSum = useMemo(() => {
     if (!selectedHand || lockedDices.length === 0) return 0;
     return getActiveDicesSum(selectedHand.name, lockedDices);
@@ -265,7 +273,7 @@ export default function GameScreen() {
           Array.from({ length: 5 }, (_, i) => ({
             id: i,
             value: Math.floor(Math.random() * 6) + 1,
-            suit: ['♠', '♥', '♦', '♣'][Math.floor(Math.random() * 4)],
+            suit: FIXED_SUITS[i],
             locked: false,
           }))
         );
@@ -278,7 +286,7 @@ export default function GameScreen() {
   return (
     <div className="min-h-screen bg-background text-foreground p-6 font-sans">
       {/* Header - Enemy Info */}
-      <div className="mb-12">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-primary mb-2">STAGE 1-1</h1>
@@ -299,8 +307,7 @@ export default function GameScreen() {
         </div>
       </div>
 
-      {/* Main Game Area */}
-      <div className="grid grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-6 h-[500px]">
         {/* Left Panel - Stats */}
         <div className="space-y-4">
           {/* Rerolls */}
@@ -331,67 +338,47 @@ export default function GameScreen() {
           </div>
         </div>
 
-        {/* Center - Dice Area */}
-        <div className="flex flex-col items-center justify-center">
-          {/* Dices Grid */}
-          <div className="grid grid-cols-3 gap-3 mb-8 w-full max-w-sm">
-            {dices.slice(0, 3).map(dice => (
-              <button
-                key={dice.id}
-                onClick={() => toggleLock(dice.id)}
-                data-testid={`dice-${dice.id}`}
-                className={`aspect-square rounded-lg font-black text-2xl transition-all duration-200 transform hover:scale-105 active:scale-95 border-2 ${
-                  dice.locked
-                    ? 'bg-primary text-primary-foreground border-primary shadow-lg'
-                    : 'bg-card text-foreground border-card-border hover:border-primary'
-                }`}
-              >
-                <div className="flex flex-col items-center justify-center h-full">
-                  <div>{dice.value}</div>
-                  <div className="text-xs mt-1">{dice.suit}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Lower Dices */}
-          <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-            {dices.slice(3, 5).map(dice => (
-              <button
-                key={dice.id}
-                onClick={() => toggleLock(dice.id)}
-                data-testid={`dice-${dice.id}`}
-                className={`aspect-square rounded-lg font-black text-2xl transition-all duration-200 transform hover:scale-105 active:scale-95 border-2 ${
-                  dice.locked
-                    ? 'bg-primary text-primary-foreground border-primary shadow-lg'
-                    : 'bg-card text-foreground border-card-border hover:border-primary'
-                }`}
-              >
-                <div className="flex flex-col items-center justify-center h-full">
-                  <div>{dice.value}</div>
-                  <div className="text-xs mt-1">{dice.suit}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Damage Display */}
+        {/* Center - 3D Dice Board */}
+        <div className="lg:col-span-2 relative">
+          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} />
+          
+          {/* Damage Display Overlay */}
           {damageDealt && (
-            <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="text-6xl font-black text-accent mb-2">{damageDealt}</div>
-              <p className="text-primary text-sm font-bold uppercase">DAMAGE!</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none animate-in fade-in duration-300">
+              <div className="text-center">
+                <div className="text-8xl font-black text-accent mb-2 drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]">{damageDealt}</div>
+                <p className="text-primary text-2xl font-bold uppercase tracking-widest">DAMAGE!</p>
+              </div>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Right Panel - Current Score & Actions */}
-        <div className="space-y-4">
-          {/* Locked Count */}
-          <div className="bg-card border border-card-border rounded-lg p-4">
-            <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Locked</p>
-            <div className="text-4xl font-black text-primary mb-3">{lockedCount}/5</div>
-          </div>
+      {/* Bottom Panel - Controls & Locked Info */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+         {/* Locked Dices (2D view for clarity) */}
+         <div className="col-span-2">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase mb-3">Locked Dices</h3>
+            <div className="flex gap-3">
+              {dices.map(dice => (
+                <div
+                  key={dice.id}
+                  onClick={() => toggleLock(dice.id)}
+                  className={`w-16 h-16 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    dice.locked
+                      ? 'bg-primary text-primary-foreground border-primary shadow-[0_0_10px_rgba(255,165,0,0.5)] scale-105'
+                      : 'bg-card text-muted-foreground border-card-border opacity-50 hover:opacity-100'
+                  }`}
+                >
+                  <span className="text-xl font-bold">{dice.value}</span>
+                  <span className="text-xs">{dice.suit}</span>
+                </div>
+              ))}
+            </div>
+         </div>
 
+         {/* Actions Panel */}
+         <div className="space-y-4">
           {/* Auto-Selected Hand */}
           <div className="bg-card border-2 border-primary rounded-lg p-4">
             <p className="text-xs font-bold text-muted-foreground uppercase mb-3">Current Hand</p>
@@ -420,32 +407,34 @@ export default function GameScreen() {
             )}
           </div>
 
-          {/* Roll Button */}
-          <button
-            onClick={rollDices}
-            disabled={rerollsLeft === 0}
-            data-testid="button-reroll"
-            className="w-full bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-black py-3 rounded-lg transition-colors duration-200"
-          >
-            REROLL ({rerollsLeft})
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+             {/* Roll Button */}
+            <button
+              onClick={rollDices}
+              disabled={rerollsLeft === 0 || rolling}
+              data-testid="button-reroll"
+              className="bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-black py-3 rounded-lg transition-colors duration-200"
+            >
+              REROLL
+            </button>
 
-          {/* Submit Button */}
-          <button
-            onClick={submitHand}
-            disabled={!selectedHand || damageDealt !== null}
-            data-testid="button-submit"
-            className="w-full bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-3 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-          >
-            <CheckCircleIcon className="w-5 h-5" />
-            SUBMIT
-          </button>
-        </div>
+            {/* Submit Button */}
+            <button
+              onClick={submitHand}
+              disabled={!selectedHand || damageDealt !== null || rolling}
+              data-testid="button-submit"
+              className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-3 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              <CheckCircleIcon className="w-5 h-5" />
+              SUBMIT
+            </button>
+          </div>
+         </div>
       </div>
 
       {/* Footer */}
-      <div className="text-center text-muted-foreground text-xs">
-        <p>Lock dice to auto-select the best hand • Click SUBMIT to attack</p>
+      <div className="text-center text-muted-foreground text-xs mt-8">
+        <p>Click 3D dice or 2D icons to lock • REROLL to shake board</p>
       </div>
     </div>
   );
