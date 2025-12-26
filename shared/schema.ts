@@ -21,8 +21,8 @@ export const gameSessions = pgTable("game_sessions", {
   gameState: text("game_state").notNull().default('combat'),
   
   // 전투 상태
-  enemyHp: integer("enemy_hp").notNull().default(300),
-  maxEnemyHp: integer("max_enemy_hp").notNull().default(300),
+  enemyHp: integer("enemy_hp").notNull().default(100),
+  maxEnemyHp: integer("max_enemy_hp").notNull().default(100),
   enemyDamage: integer("enemy_damage").notNull().default(10),
   rerollsLeft: integer("rerolls_left").notNull().default(3),
   
