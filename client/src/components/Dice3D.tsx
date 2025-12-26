@@ -14,10 +14,10 @@ const SUIT_COLORS: Record<string, string> = {
 
 const SUIT_TEXT_COLORS: Record<string, string> = {
   'None': '#000000',
-  '♠': '#1a1a1a',
-  '♦': '#f97316',
-  '♥': '#dc2626',
-  '♣': '#1e3a5f',
+  '♠': '#000000',
+  '♦': '#c2410c',
+  '♥': '#b91c1c',
+  '♣': '#0f172a',
 };
 
 const PIP_POSITIONS: Record<number, [number, number][]> = {
