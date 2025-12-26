@@ -371,30 +371,54 @@ export default function GameScreen() {
 
       {/* Main Content - Flexible height */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
-        {/* Left Panel - Stats */}
+        {/* Left Panel - Stats, Jokers & Consumables */}
         <div className="hidden lg:flex flex-col gap-3">
-          <div className="bg-card border border-card-border rounded-lg p-3 flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-1">
+          {/* Stats Row */}
+          <div className="flex gap-2">
+            <div className="bg-card border border-card-border rounded-lg px-3 py-2 flex items-center gap-2">
               <RotateCcwIcon className="w-4 h-4 text-primary" />
-              <span className="text-xs font-bold text-muted-foreground uppercase">Rerolls</span>
+              <span className="text-lg font-black text-foreground" data-testid="text-rerolls">{game.rerollsLeft}</span>
             </div>
-            <div className="text-3xl font-black text-foreground" data-testid="text-rerolls">{game.rerollsLeft}</div>
-          </div>
-
-          <div className="bg-card border border-card-border rounded-lg p-3 flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="bg-card border border-card-border rounded-lg px-3 py-2 flex items-center gap-2">
               <Crown className="w-4 h-4 text-primary" />
-              <span className="text-xs font-bold text-muted-foreground uppercase">Gold</span>
+              <span className="text-lg font-black text-primary" data-testid="text-gold">${game.gold}</span>
             </div>
-            <div className="text-3xl font-black text-primary" data-testid="text-gold">${game.gold}</div>
+            <div className="bg-card border border-card-border rounded-lg px-3 py-2 flex items-center gap-2">
+              <HeartIcon className="w-4 h-4 text-destructive" />
+              <span className="text-lg font-black text-destructive" data-testid="text-health">{game.health}</span>
+            </div>
           </div>
 
-          <div className="bg-card border border-card-border rounded-lg p-3 flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-1">
-              <HeartIcon className="w-4 h-4 text-destructive" />
-              <span className="text-xs font-bold text-muted-foreground uppercase">Health</span>
+          {/* Joker Slots */}
+          <div className="bg-card border border-card-border rounded-lg p-3">
+            <div className="text-xs font-bold text-muted-foreground uppercase mb-2">Jokers</div>
+            <div className="grid grid-cols-5 gap-2">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={`joker-${i}`}
+                  data-testid={`slot-joker-${i}`}
+                  className="aspect-[3/4] bg-background/50 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center hover:border-primary/50 transition-colors cursor-pointer"
+                >
+                  <span className="text-2xl text-muted-foreground/30">🃏</span>
+                </div>
+              ))}
             </div>
-            <div className="text-3xl font-black text-destructive" data-testid="text-health">{game.health}</div>
+          </div>
+
+          {/* Consumable Slots */}
+          <div className="bg-card border border-card-border rounded-lg p-3">
+            <div className="text-xs font-bold text-muted-foreground uppercase mb-2">Consumables</div>
+            <div className="grid grid-cols-3 gap-2">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={`consumable-${i}`}
+                  data-testid={`slot-consumable-${i}`}
+                  className="aspect-square bg-background/50 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center hover:border-primary/50 transition-colors cursor-pointer"
+                >
+                  <span className="text-xl text-muted-foreground/30">⚗️</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
