@@ -41,7 +41,7 @@ export async function registerRoutes(
         maxHealth: 100,
         gold: 0,
         score: 0,
-        currentStage: 1,
+        currentStage: 0,
         currentRound: 1,
         gameState: 'stage_select',
         enemyHp: 100,
