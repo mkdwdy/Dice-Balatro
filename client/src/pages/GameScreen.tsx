@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown } from 'lucide-react';
+import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown, Zap } from 'lucide-react';
 import DiceBoard from '@/components/Dice3D';
 import type { GameSession, Dice } from '@shared/schema';
 
@@ -158,6 +158,13 @@ export default function GameScreen() {
   const [dices, setDices] = useState<Dice[]>([]);
   const [damageDealt, setDamageDealt] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
+  
+  const [isCharging, setIsCharging] = useState(false);
+  const [chargePower, setChargePower] = useState(0);
+  const [rollPower, setRollPower] = useState(1);
+  const chargeStartRef = useRef<number>(0);
+  const chargeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const MAX_CHARGE_TIME = 1500;
 
   useEffect(() => {
     if (match && params?.id) {
@@ -205,9 +212,33 @@ export default function GameScreen() {
     setDices(dices.map(d => d.id === id ? { ...d, locked: !d.locked } : d));
   };
 
-  const rollDices = async () => {
-    if (!game || game.rerollsLeft <= 0) return;
+  const startCharging = useCallback(() => {
+    if (!game || game.rerollsLeft <= 0 || rolling) return;
+    
+    setIsCharging(true);
+    setChargePower(0);
+    chargeStartRef.current = Date.now();
+    
+    chargeIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - chargeStartRef.current;
+      const power = Math.min(elapsed / MAX_CHARGE_TIME, 1);
+      setChargePower(power);
+    }, 16);
+  }, [game, rolling]);
 
+  const releaseCharge = useCallback(async () => {
+    if (!isCharging || !game) return;
+    
+    if (chargeIntervalRef.current) {
+      clearInterval(chargeIntervalRef.current);
+      chargeIntervalRef.current = null;
+    }
+    
+    const finalPower = chargePower;
+    setIsCharging(false);
+    setChargePower(0);
+    setRollPower(finalPower);
+    
     setRolling(true);
     const updatedDices = dices.map(d => d.locked ? d : { ...d, locked: false });
     setDices(updatedDices);
@@ -227,7 +258,15 @@ export default function GameScreen() {
       console.error('Failed to roll dices:', error);
       setRolling(false);
     }
-  };
+  }, [isCharging, game, chargePower, dices]);
+
+  useEffect(() => {
+    return () => {
+      if (chargeIntervalRef.current) {
+        clearInterval(chargeIntervalRef.current);
+      }
+    };
+  }, []);
 
   const lockedDices = useMemo(() => dices.filter(d => d.locked), [dices]);
   const activeDicesSum = useMemo(() => {
@@ -341,7 +380,7 @@ export default function GameScreen() {
 
         {/* Center - 3D Dice Board */}
         <div className="lg:col-span-3 relative min-h-0">
-          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} />
+          <DiceBoard dices={dices} onLockToggle={toggleLock} rolling={rolling} power={rollPower} />
           
           {damageDealt && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none animate-in fade-in duration-300">
@@ -403,14 +442,40 @@ export default function GameScreen() {
               </div>
             )}
 
-            <button
-              onClick={rollDices}
-              disabled={game.rerollsLeft === 0 || rolling}
-              data-testid="button-reroll"
-              className="bg-secondary hover:bg-secondary/90 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-black py-2 px-4 rounded-lg transition-colors"
-            >
-              REROLL
-            </button>
+            <div className="relative">
+              <button
+                onMouseDown={startCharging}
+                onMouseUp={releaseCharge}
+                onMouseLeave={() => isCharging && releaseCharge()}
+                onTouchStart={startCharging}
+                onTouchEnd={releaseCharge}
+                disabled={game.rerollsLeft === 0 || rolling}
+                data-testid="button-reroll"
+                className={`relative overflow-hidden font-black py-2 px-4 rounded-lg transition-all select-none ${
+                  game.rerollsLeft === 0 || rolling
+                    ? 'bg-muted text-muted-foreground'
+                    : isCharging
+                    ? 'bg-accent text-accent-foreground scale-105'
+                    : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'
+                }`}
+              >
+                {isCharging && (
+                  <div 
+                    className="absolute inset-0 bg-primary/50 transition-all"
+                    style={{ width: `${chargePower * 100}%` }}
+                  />
+                )}
+                <span className="relative flex items-center gap-1">
+                  {isCharging ? <Zap className="w-4 h-4 animate-pulse" /> : <RotateCcwIcon className="w-4 h-4" />}
+                  {isCharging ? `${Math.round(chargePower * 100)}%` : 'HOLD'}
+                </span>
+              </button>
+              {!isCharging && !rolling && game.rerollsLeft > 0 && (
+                <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-muted-foreground whitespace-nowrap">
+                  Hold longer = stronger
+                </span>
+              )}
+            </div>
 
             <button
               onClick={submitHand}
