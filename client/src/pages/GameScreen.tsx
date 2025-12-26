@@ -158,6 +158,7 @@ export default function GameScreen() {
   const [dices, setDices] = useState<Dice[]>([]);
   const [damageDealt, setDamageDealt] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
+  const [waitingForNewRound, setWaitingForNewRound] = useState(false);
   
   const [isCharging, setIsCharging] = useState(false);
   const [chargePower, setChargePower] = useState(0);
@@ -317,12 +318,41 @@ export default function GameScreen() {
       setTimeout(() => {
         setGame(updatedGame);
         setDamageDealt(null);
+        setDices([]);
+        setWaitingForNewRound(true);
       }, 1500);
     } catch (error) {
       console.error('Failed to submit hand:', error);
       setDamageDealt(null);
     }
   };
+
+  const startNewRound = useCallback(async () => {
+    if (!game) return;
+    
+    setWaitingForNewRound(false);
+    setRolling(true);
+    setRollPower(0.5);
+    
+    try {
+      const response = await fetch(`/api/games/${game.id}/roll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lockedDices: [] }),
+      });
+      const updatedGame = await response.json();
+      
+      setDices(updatedGame.dices as Dice[]);
+      
+      setTimeout(() => {
+        setGame(updatedGame);
+        setRolling(false);
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to start new round:', error);
+      setRolling(false);
+    }
+  }, [game]);
 
   if (loading) {
     return (
@@ -437,59 +467,73 @@ export default function GameScreen() {
 
           {/* Floating Controls - Bottom Right */}
           <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 items-end">
-            {selectedHand && (
-              <div className="bg-card/90 backdrop-blur border border-primary rounded-lg px-3 py-2 text-center shadow-lg">
-                <div className="text-sm font-black text-primary" data-testid="text-hand-name">{selectedHand.name}</div>
-                <div className="text-lg font-black text-accent" data-testid="text-calculated-damage">{calculateScore()} DMG</div>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <div className="relative">
-                <button
-                  onMouseDown={startCharging}
-                  onMouseUp={releaseCharge}
-                  onMouseLeave={() => isCharging && releaseCharge()}
-                  onTouchStart={startCharging}
-                  onTouchEnd={releaseCharge}
-                  disabled={game.rerollsLeft === 0 || rolling}
-                  data-testid="button-reroll"
-                  className={`relative overflow-hidden font-black py-3 px-5 rounded-lg transition-all select-none shadow-lg ${
-                    game.rerollsLeft === 0 || rolling
-                      ? 'bg-muted text-muted-foreground'
-                      : isCharging
-                      ? 'bg-accent text-accent-foreground scale-105'
-                      : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'
-                  }`}
-                >
-                  {isCharging && (
-                    <div 
-                      className="absolute inset-0 bg-primary/50 transition-all"
-                      style={{ width: `${chargePower * 100}%` }}
-                    />
-                  )}
-                  <span className="relative flex items-center gap-1">
-                    {isCharging ? <Zap className="w-4 h-4 animate-pulse" /> : <RotateCcwIcon className="w-4 h-4" />}
-                    {isCharging ? `${Math.round(chargePower * 100)}%` : 'HOLD'}
-                  </span>
-                </button>
-                {!isCharging && !rolling && game.rerollsLeft > 0 && (
-                  <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-white/70 whitespace-nowrap drop-shadow">
-                    Hold longer = stronger
-                  </span>
-                )}
-              </div>
-
+            {waitingForNewRound ? (
               <button
-                onClick={submitHand}
-                disabled={!selectedHand || damageDealt !== null || rolling}
-                data-testid="button-submit"
-                className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-3 px-5 rounded-lg transition-colors flex items-center gap-1 shadow-lg"
+                onClick={startNewRound}
+                disabled={rolling}
+                data-testid="button-new-round"
+                className="bg-accent hover:bg-accent/90 disabled:bg-muted disabled:text-muted-foreground text-accent-foreground font-black py-4 px-8 rounded-lg transition-colors flex items-center gap-2 shadow-lg text-lg"
               >
-                <CheckCircleIcon className="w-4 h-4" />
-                SUBMIT
+                <RotateCcwIcon className="w-5 h-5" />
+                ROLL DICE
               </button>
-            </div>
+            ) : (
+              <>
+                {selectedHand && (
+                  <div className="bg-card/90 backdrop-blur border border-primary rounded-lg px-3 py-2 text-center shadow-lg">
+                    <div className="text-sm font-black text-primary" data-testid="text-hand-name">{selectedHand.name}</div>
+                    <div className="text-lg font-black text-accent" data-testid="text-calculated-damage">{calculateScore()} DMG</div>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <button
+                      onMouseDown={startCharging}
+                      onMouseUp={releaseCharge}
+                      onMouseLeave={() => isCharging && releaseCharge()}
+                      onTouchStart={startCharging}
+                      onTouchEnd={releaseCharge}
+                      disabled={game.rerollsLeft === 0 || rolling}
+                      data-testid="button-reroll"
+                      className={`relative overflow-hidden font-black py-3 px-5 rounded-lg transition-all select-none shadow-lg ${
+                        game.rerollsLeft === 0 || rolling
+                          ? 'bg-muted text-muted-foreground'
+                          : isCharging
+                          ? 'bg-accent text-accent-foreground scale-105'
+                          : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'
+                      }`}
+                    >
+                      {isCharging && (
+                        <div 
+                          className="absolute inset-0 bg-primary/50 transition-all"
+                          style={{ width: `${chargePower * 100}%` }}
+                        />
+                      )}
+                      <span className="relative flex items-center gap-1">
+                        {isCharging ? <Zap className="w-4 h-4 animate-pulse" /> : <RotateCcwIcon className="w-4 h-4" />}
+                        {isCharging ? `${Math.round(chargePower * 100)}%` : 'HOLD'}
+                      </span>
+                    </button>
+                    {!isCharging && !rolling && game.rerollsLeft > 0 && (
+                      <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-white/70 whitespace-nowrap drop-shadow">
+                        Hold longer = stronger
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={submitHand}
+                    disabled={!selectedHand || damageDealt !== null || rolling}
+                    data-testid="button-submit"
+                    className="bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-black py-3 px-5 rounded-lg transition-colors flex items-center gap-1 shadow-lg"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" />
+                    SUBMIT
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Mobile Stats - Top Left */}
