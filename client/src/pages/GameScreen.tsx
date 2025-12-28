@@ -1,8 +1,12 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown, Zap, RefreshCw } from 'lucide-react';
+import { HeartIcon, RotateCcwIcon, CheckCircleIcon, Crown, Zap, RefreshCw, List, Sparkles, Wand2 } from 'lucide-react';
 import DiceBoard from '@/components/Dice3D';
-import type { GameSession, Dice } from '@shared/schema';
+import DiceListModal from '@/components/DiceListModal';
+import HandUpgradeModal from '@/components/HandUpgradeModal';
+import DiceEnchantModal from '@/components/DiceEnchantModal';
+import type { GameSession, Dice, DeckDice } from '@shared/schema';
+import { isDeckDiceArray } from '@shared/schema';
 
 interface HandType {
   name: string;
@@ -165,7 +169,13 @@ export default function GameScreen() {
   const [rollPower, setRollPower] = useState(1);
   const chargeStartRef = useRef<number>(0);
   const chargeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const dicesRef = useRef<Dice[]>([]);
   const MAX_CHARGE_TIME = 1500;
+
+  // 모달 상태
+  const [showDiceList, setShowDiceList] = useState(false);
+  const [showHandUpgrade, setShowHandUpgrade] = useState(false);
+  const [showDiceEnchant, setShowDiceEnchant] = useState(false);
 
   useEffect(() => {
     if (match && params?.id) {
@@ -217,12 +227,16 @@ export default function GameScreen() {
   };
 
   const handleValueSettled = useCallback((id: number, value: number) => {
-    setDices(prevDices => prevDices.map(d => {
-      if (d.id === id && !d.locked) {
-        return { ...d, value };
-      }
-      return d;
-    }));
+    setDices(prevDices => {
+      const updated = prevDices.map(d => {
+        if (d.id === id && !d.locked) {
+          return { ...d, value };
+        }
+        return d;
+      });
+      dicesRef.current = updated;
+      return updated;
+    });
   }, []);
 
   const startCharging = useCallback(() => {
@@ -292,9 +306,15 @@ export default function GameScreen() {
   }, [selectedHand, lockedDices]);
 
   const calculateScore = () => {
-    if (!selectedHand) return 0;
-    const multiplier = selectedHand.multiplier || 0;
-    return activeDicesSum * (multiplier + 1);
+    if (!selectedHand || !game) return 0;
+    const baseMultiplier = selectedHand.multiplier || 0;
+    
+    // 족보 업그레이드 보너스 적용
+    const handUpgrades = (game.handUpgrades as Record<string, number>) || {};
+    const upgradeBonus = handUpgrades[selectedHand.name] || 0;
+    const totalMultiplier = baseMultiplier + upgradeBonus;
+    
+    return activeDicesSum * (totalMultiplier + 1);
   };
 
   const submitHand = async () => {
@@ -338,17 +358,98 @@ export default function GameScreen() {
       });
       const updatedGame = await response.json();
       
-      setDices(updatedGame.dices as Dice[]);
+      const newDices = updatedGame.dices as Dice[];
+      setDices(newDices);
+      dicesRef.current = newDices;
+      setGame(updatedGame);
       
+      // 주사위가 모두 정착된 후 덱 동기화 (약간의 지연 후)
       setTimeout(() => {
-        setGame(updatedGame);
         setRolling(false);
+        
+        // 주사위가 모두 정착된 후 덱 동기화 (현재 클라이언트의 실제 주사위 값 사용)
+        setTimeout(() => {
+          if (game) {
+            // 현재 클라이언트의 주사위 상태 사용 (ref를 통해 최신 값 보장)
+            const currentDices = dicesRef.current.length > 0 ? dicesRef.current : (updatedGame.dices as Dice[]);
+            if (currentDices.length > 0 && currentDices.every(d => d.value > 0 && d.value <= 6)) {
+              fetch(`/api/games/${game.id}/sync-dice-deck`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dices: currentDices }),
+              })
+                .then(res => {
+                  if (!res.ok) {
+                    return res.json().then(err => { throw new Error(err.error || 'Sync failed'); });
+                  }
+                  return res.json();
+                })
+                .then(syncedGame => {
+                  setGame(syncedGame);
+                })
+                .catch(err => {
+                  console.error('Failed to sync dice deck:', err);
+                });
+            }
+          }
+        }, 2000); // 주사위가 완전히 정착될 때까지 충분한 대기
       }, 1500);
     } catch (error) {
       console.error('Failed to start new round:', error);
       setRolling(false);
     }
   }, [game]);
+
+  // 족보 업그레이드 핸들러
+  const handleUpgradeHand = async (planetCardId: string, handName: string) => {
+    if (!game) return;
+    
+    try {
+      const response = await fetch(`/api/games/${game.id}/upgrade-hand`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planetCardId, handName }),
+      });
+      const updatedGame = await response.json();
+      setGame(updatedGame);
+    } catch (error) {
+      console.error('Failed to upgrade hand:', error);
+      throw error;
+    }
+  };
+
+  // 주사위 인챈트 핸들러
+  const handleEnchantDice = async (
+    consumableId: string,
+    diceId: number | undefined,
+    target: 'top' | 'all',
+    enchantType: 'value' | 'suit' | 'both',
+    newValue?: number,
+    newSuit?: 'None' | '♠' | '♦' | '♥' | '♣'
+  ) => {
+    if (!game) return;
+    
+    try {
+      const response = await fetch(`/api/games/${game.id}/enchant-dice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          consumableId,
+          diceId,
+          target,
+          enchantType,
+          newValue,
+          newSuit,
+        }),
+      });
+      const updatedGame = await response.json();
+      setGame(updatedGame);
+      setDices(updatedGame.dices as Dice[]);
+    } catch (error) {
+      console.error('Failed to enchant dice:', error);
+      throw error;
+    }
+  };
 
   if (loading) {
     return (
@@ -467,6 +568,31 @@ export default function GameScreen() {
             </div>
           )}
 
+          {/* Action Buttons - Top Right */}
+          <div className="absolute top-4 right-4 z-20 flex gap-2">
+            <button
+              onClick={() => setShowDiceList(true)}
+              className="bg-card/90 backdrop-blur border border-card-border hover:border-primary rounded-lg p-3 transition-colors shadow-lg"
+              title="주사위 리스트"
+            >
+              <List className="w-5 h-5 text-primary" />
+            </button>
+            <button
+              onClick={() => setShowHandUpgrade(true)}
+              className="bg-card/90 backdrop-blur border border-card-border hover:border-primary rounded-lg p-3 transition-colors shadow-lg"
+              title="족보 업그레이드"
+            >
+              <Sparkles className="w-5 h-5 text-primary" />
+            </button>
+            <button
+              onClick={() => setShowDiceEnchant(true)}
+              className="bg-card/90 backdrop-blur border border-card-border hover:border-primary rounded-lg p-3 transition-colors shadow-lg"
+              title="주사위 인챈트"
+            >
+              <Wand2 className="w-5 h-5 text-primary" />
+            </button>
+          </div>
+
           {/* Floating Controls - Bottom Right */}
           <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 items-end">
             {waitingForNewRound ? (
@@ -570,6 +696,30 @@ export default function GameScreen() {
         <RefreshCw className="w-4 h-4" />
         RESET
       </button>
+
+      {/* Modals */}
+      {game && (
+        <>
+          <DiceListModal
+            diceDeck={isDeckDiceArray(game.diceDeck) ? game.diceDeck : []}
+            isOpen={showDiceList}
+            onClose={() => setShowDiceList(false)}
+          />
+          <HandUpgradeModal
+            game={game}
+            isOpen={showHandUpgrade}
+            onClose={() => setShowHandUpgrade(false)}
+            onUpgrade={handleUpgradeHand}
+          />
+          <DiceEnchantModal
+            game={game}
+            dices={dices}
+            isOpen={showDiceEnchant}
+            onClose={() => setShowDiceEnchant(false)}
+            onEnchant={handleEnchantDice}
+          />
+        </>
+      )}
     </div>
   );
 }

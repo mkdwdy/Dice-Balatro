@@ -27,13 +27,20 @@ export const gameSessions = pgTable("game_sessions", {
   pendingGoldReward: integer("pending_gold_reward").notNull().default(0),
   rerollsLeft: integer("rerolls_left").notNull().default(3),
   
-  // 주사위 상태 (JSON 배열)
+  // 주사위 상태 (JSON 배열) - 현재 손에 있는 주사위
   dices: jsonb("dices").notNull().default(sql`'[]'::jsonb`),
+  
+  // 주사위 덱 (JSON 배열) - 보유한 모든 주사위의 모든 면 정보
+  diceDeck: jsonb("dice_deck").notNull().default(sql`'[]'::jsonb`),
   
   // 인벤토리 (JSON 배열)
   jokers: jsonb("jokers").notNull().default(sql`'[]'::jsonb`),
   consumables: jsonb("consumables").notNull().default(sql`'[]'::jsonb`),
   vouchers: jsonb("vouchers").notNull().default(sql`'[]'::jsonb`),
+  
+  // 족보 업그레이드 (행성 카드로 업그레이드된 족보의 multiplier 증가량)
+  // 예: { "Pair": 1, "Triple": 2 } -> Pair는 +1, Triple은 +2 multiplier 증가
+  handUpgrades: jsonb("hand_upgrades").notNull().default(sql`'{}'::jsonb`),
   
   // 타임스탬프
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -64,6 +71,23 @@ export const diceSchema = z.object({
 
 export type Dice = z.infer<typeof diceSchema>;
 
+// 주사위 면 타입 (6면체 주사위의 각 면)
+export const diceFaceSchema = z.object({
+  value: z.number().min(1).max(6),
+  suit: z.enum(['None', '♠', '♦', '♥', '♣']),
+});
+
+export type DiceFace = z.infer<typeof diceFaceSchema>;
+
+// 주사위 덱의 주사위 타입 (모든 면 정보 포함)
+export const deckDiceSchema = z.object({
+  id: z.number(),
+  faces: z.array(diceFaceSchema).length(6), // 6면체이므로 항상 6개
+  currentTopFace: z.number().min(0).max(5), // 현재 윗면 인덱스
+});
+
+export type DeckDice = z.infer<typeof deckDiceSchema>;
+
 // 조커 타입 (나중에 확장 가능)
 export const jokerSchema = z.object({
   id: z.string(),
@@ -93,3 +117,29 @@ export const voucherSchema = z.object({
 });
 
 export type Voucher = z.infer<typeof voucherSchema>;
+
+// 타입 가드 함수들
+export function isDiceArray(value: unknown): value is Dice[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => diceSchema.safeParse(item).success);
+}
+
+export function isJokerArray(value: unknown): value is Joker[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => jokerSchema.safeParse(item).success);
+}
+
+export function isConsumableArray(value: unknown): value is Consumable[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => consumableSchema.safeParse(item).success);
+}
+
+export function isVoucherArray(value: unknown): value is Voucher[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => voucherSchema.safeParse(item).success);
+}
+
+export function isDeckDiceArray(value: unknown): value is DeckDice[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => deckDiceSchema.safeParse(item).success);
+}
