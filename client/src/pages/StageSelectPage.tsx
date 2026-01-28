@@ -1,20 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { Swords, HeartIcon, Crown, RefreshCw, Play } from 'lucide-react';
+import { toast } from 'sonner';
 import type { GameSession } from '@shared/schema';
-
-// 스테이지별 스탯 계산
-function getStageStats(stage: number) {
-  const baseHp = 100;
-  const baseReward = 3;
-  const stageMultiplier = 1 + (stage - 1) * 0.5;
-  
-  return {
-    enemyHp: Math.round(baseHp * stageMultiplier),
-    goldReward: Math.round(baseReward * stageMultiplier),
-    enemyDamage: Math.round(10 + (stage - 1) * 2),
-  };
-}
+import { getStageStats } from '@shared/gameLogic';
 
 export default function StageSelectPage() {
   const [match, params] = useRoute('/stage-select/:id');
@@ -31,10 +20,17 @@ export default function StageSelectPage() {
   const fetchGame = async (id: string) => {
     try {
       const response = await fetch(`/api/games/${id}`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to fetch game' }));
+        throw new Error(error.error || 'Failed to fetch game');
+      }
       const data = await response.json();
       setGame(data);
     } catch (error) {
       console.error('Failed to fetch game:', error);
+      toast.error('게임을 불러오는데 실패했습니다', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다',
+      });
     } finally {
       setLoading(false);
     }
@@ -44,21 +40,41 @@ export default function StageSelectPage() {
     if (!game) return;
 
     try {
-      await fetch(`/api/games/${game.id}/next-stage`, {
+      const response = await fetch(`/api/games/${game.id}/next-stage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stageChoice: 'easy' }),
       });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to start battle' }));
+        throw new Error(error.error || 'Failed to start battle');
+      }
+
       setLocation(`/game/${game.id}`);
     } catch (error) {
       console.error('Failed to start battle:', error);
+      toast.error('전투 시작에 실패했습니다', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다',
+      });
     }
   };
 
   const resetGame = async () => {
-    const response = await fetch('/api/games/new', { method: 'POST' });
-    const newGame = await response.json();
-    setLocation(`/stage-select/${newGame.id}`);
+    try {
+      const response = await fetch('/api/games/new', { method: 'POST' });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to reset game' }));
+        throw new Error(error.error || 'Failed to reset game');
+      }
+      const newGame = await response.json();
+      setLocation(`/stage-select/${newGame.id}`);
+    } catch (error) {
+      console.error('Failed to reset game:', error);
+      toast.error('게임 리셋에 실패했습니다', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다',
+      });
+    }
   };
 
   if (loading) {

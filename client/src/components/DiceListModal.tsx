@@ -1,14 +1,38 @@
-import { X } from 'lucide-react';
-import type { DeckDice } from '@shared/schema';
+import { X, Lock, Unlock, CheckCircle } from 'lucide-react';
+import type { DeckDice, Dice } from '@shared/schema';
+
+interface HandType {
+  name: string;
+  multiplier: number;
+  condition: string;
+}
 
 interface DiceListModalProps {
   diceDeck: DeckDice[];
+  dices: Dice[]; // 현재 게임 화면의 주사위 상태
   isOpen: boolean;
   onClose: () => void;
+  onLockToggle: (id: number, value: number) => void; // 주사위 잠금/해제 함수
+  onSubmit?: () => void; // 족보 제출 함수
+  selectedHand?: HandType | null; // 현재 선택된 족보
 }
 
-export default function DiceListModal({ diceDeck, isOpen, onClose }: DiceListModalProps) {
+export default function DiceListModal({ diceDeck, dices, isOpen, onClose, onLockToggle, onSubmit, selectedHand }: DiceListModalProps) {
   if (!isOpen) return null;
+
+  // 현재 게임 화면의 주사위 상태를 ID로 매핑
+  const diceStateMap = new Map(dices.map(d => [d.id, d]));
+  
+  // 잠긴 주사위 개수 확인
+  const lockedDices = dices.filter(d => d.locked);
+  const canSubmit = selectedHand && lockedDices.length > 0 && onSubmit;
+  
+  const handleSubmit = async () => {
+    if (canSubmit && onSubmit) {
+      await onSubmit();
+      onClose(); // 제출 후 모달 닫기
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -44,7 +68,53 @@ export default function DiceListModal({ diceDeck, isOpen, onClose }: DiceListMod
                           {currentFace.value} {currentFace.suit === 'None' ? '' : currentFace.suit}
                         </span>
                       </div>
+                      {diceStateMap.has(dice.id) && (
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${
+                          diceStateMap.get(dice.id)?.locked 
+                            ? 'bg-yellow-500/20 border border-yellow-500/50' 
+                            : 'bg-muted/50'
+                        }`}>
+                          {diceStateMap.get(dice.id)?.locked ? (
+                            <>
+                              <Lock className="w-4 h-4 text-yellow-500" />
+                              <span className="text-xs font-bold text-yellow-500">잠금</span>
+                            </>
+                          ) : (
+                            <>
+                              <Unlock className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">해제</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
+                    {diceStateMap.has(dice.id) && (
+                      <button
+                        onClick={() => {
+                          const currentDice = diceStateMap.get(dice.id);
+                          if (currentDice) {
+                            onLockToggle(dice.id, currentDice.value);
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2 ${
+                          diceStateMap.get(dice.id)?.locked
+                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                            : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                        }`}
+                      >
+                        {diceStateMap.get(dice.id)?.locked ? (
+                          <>
+                            <Unlock className="w-4 h-4" />
+                            잠금 해제
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4" />
+                            잠금
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* 모든 면 표시 */}
@@ -107,9 +177,37 @@ export default function DiceListModal({ diceDeck, isOpen, onClose }: DiceListMod
         )}
 
         <div className="mt-6 pt-4 border-t border-card-border">
-          <p className="text-xs text-muted-foreground text-center">
-            총 {diceDeck.length}개의 주사위 (각 주사위는 6면체)
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-1">
+              <p className="text-xs text-muted-foreground">
+                총 {diceDeck.length}개의 주사위 (각 주사위는 6면체)
+              </p>
+              {selectedHand && (
+                <p className="text-sm font-bold text-primary">
+                  선택된 족보: {selectedHand.name} (x{selectedHand.multiplier + 1})
+                </p>
+              )}
+              {lockedDices.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  잠긴 주사위: {lockedDices.length}개
+                </p>
+              )}
+            </div>
+            {onSubmit && (
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={`px-6 py-3 rounded-lg font-black text-sm transition-colors flex items-center gap-2 ${
+                  canSubmit
+                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg'
+                    : 'bg-muted text-muted-foreground cursor-not-allowed'
+                }`}
+              >
+                <CheckCircle className="w-5 h-5" />
+                SUBMIT
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

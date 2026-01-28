@@ -27,6 +27,10 @@ export type { BalatroVoucher } from './balatro-schemas';
 export * from './balatro-boosters-db';
 export type { BalatroBooster } from './balatro-schemas';
 
+// 빌드
+export * from './balatro-builds-db';
+export type { BalatroBuild, BuildCategory, BuildTier } from './balatro-builds-db';
+
 // 통계
 export const benchmarkStats = {
   jokers: 150,
@@ -35,5 +39,6 @@ export const benchmarkStats = {
   spectrals: 18,
   vouchers: 32,
   boosters: 17,
-  total: 251,
+  builds: 10,
+  total: 261,
 };

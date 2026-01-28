@@ -12,6 +12,7 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async createGameSession(insertSession: InsertGameSession): Promise<GameSession> {
     const { db } = await import("./db");
+    if (!db) throw new Error("Database not initialized");
     const [session] = await db
       .insert(gameSessions)
       .values(insertSession)
@@ -21,12 +22,14 @@ export class DatabaseStorage implements IStorage {
 
   async getGameSession(id: string): Promise<GameSession | undefined> {
     const { db } = await import("./db");
+    if (!db) throw new Error("Database not initialized");
     const [session] = await db.select().from(gameSessions).where(eq(gameSessions.id, id));
     return session || undefined;
   }
 
   async updateGameSession(id: string, updates: UpdateGameSession): Promise<GameSession | undefined> {
     const { db } = await import("./db");
+    if (!db) throw new Error("Database not initialized");
     const [session] = await db
       .update(gameSessions)
       .set({ ...updates, updatedAt: new Date() })
@@ -37,6 +40,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGameSession(id: string): Promise<void> {
     const { db } = await import("./db");
+    if (!db) throw new Error("Database not initialized");
     await db.delete(gameSessions).where(eq(gameSessions.id, id));
   }
 }

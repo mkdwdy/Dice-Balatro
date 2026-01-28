@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { Crown, ShoppingBag, ArrowRight, Sparkles } from 'lucide-react';
-import type { GameSession } from '@shared/schema';
+import type { GameSession, Joker, Consumable } from '@shared/schema';
+import { toast } from 'sonner';
 
-const SHOP_ITEMS = {
+type ShopItem = {
+  id: string;
+  name: string;
+  description: string;
+  effect: string;
+  cost: number;
+};
+
+const SHOP_ITEMS: {
+  jokers: ShopItem[];
+  consumables: ShopItem[];
+} = {
   jokers: [
     { id: 'joker_1', name: 'Lucky Joker', description: '+10% damage on all hands', effect: 'damage_boost', cost: 5 },
     { id: 'joker_2', name: 'Suit Master', description: 'Flushes get +2 multiplier', effect: 'flush_boost', cost: 8 },
@@ -15,6 +27,24 @@ const SHOP_ITEMS = {
     { id: 'consumable_3', name: 'Gold Coin', description: 'Gain $5', effect: 'gold', cost: 2 },
   ],
 };
+
+function shopItemToJoker(item: ShopItem): Joker {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    effect: item.effect,
+  };
+}
+
+function shopItemToConsumable(item: ShopItem): Consumable {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    effect: item.effect,
+  };
+}
 
 export default function ShopPage() {
   const [match, params] = useRoute('/shop/:id');
@@ -31,28 +61,53 @@ export default function ShopPage() {
   const fetchGame = async (id: string) => {
     try {
       const response = await fetch(`/api/games/${id}`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to fetch game' }));
+        throw new Error(error.error || 'Failed to fetch game');
+      }
       const data = await response.json();
+      console.log(`[SHOP DEBUG] Fetched game gold: ${data.gold}`);
       setGame(data);
     } catch (error) {
       console.error('Failed to fetch game:', error);
+      toast.error('게임을 불러오는데 실패했습니다', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const buyItem = async (itemType: string, item: any) => {
-    if (!game || game.gold < item.cost) return;
+  const buyItem = async (itemType: 'joker' | 'consumable' | 'voucher', item: ShopItem) => {
+    if (!game || game.gold < item.cost) {
+      toast.error('골드가 부족합니다');
+      return;
+    }
 
     try {
+      const itemData = itemType === 'joker' 
+        ? shopItemToJoker(item)
+        : shopItemToConsumable(item);
+
       const response = await fetch(`/api/games/${game.id}/shop/buy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemType, item, cost: item.cost }),
+        body: JSON.stringify({ itemType, item: itemData, cost: item.cost }),
       });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to buy item' }));
+        throw new Error(error.error || 'Failed to buy item');
+      }
+
       const updatedGame = await response.json();
       setGame(updatedGame);
+      toast.success(`${item.name}을(를) 구매했습니다`);
     } catch (error) {
       console.error('Failed to buy item:', error);
+      toast.error('아이템 구매에 실패했습니다', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다',
+      });
     }
   };
 
@@ -60,12 +115,21 @@ export default function ShopPage() {
     if (!game) return;
 
     try {
-      await fetch(`/api/games/${game.id}/shop/exit`, {
+      const response = await fetch(`/api/games/${game.id}/shop/exit`, {
         method: 'POST',
       });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to exit shop' }));
+        throw new Error(error.error || 'Failed to exit shop');
+      }
+
       setLocation(`/stage-select/${game.id}`);
     } catch (error) {
       console.error('Failed to exit shop:', error);
+      toast.error('상점을 나가는데 실패했습니다', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다',
+      });
     }
   };
 

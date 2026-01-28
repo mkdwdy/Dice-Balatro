@@ -9,7 +9,8 @@ export const rollDiceSchema = z.object({
 });
 
 export const submitHandSchema = z.object({
-  damage: z.number().min(0),
+  lockedDices: z.array(diceSchema), // 잠긴 주사위 배열 (순차 발동용)
+  handName: z.string(), // 선택된 족보 이름
 });
 
 export const nextStageSchema = z.object({
@@ -36,4 +37,13 @@ export const enchantDiceSchema = z.object({
   enchantType: z.enum(['value', 'suit', 'both']), // 변경 타입
   newValue: z.number().min(1).max(6).optional(), // 새 값 (value 또는 both일 때)
   newSuit: z.enum(['None', '♠', '♦', '♥', '♣']).optional(), // 새 슈트 (suit 또는 both일 때)
+});
+
+// 주사위 덱 동기화 스키마
+export const syncDiceDeckSchema = z.object({
+  dices: z.array(z.object({
+    id: z.number(),
+    value: z.number().min(1).max(6),
+    suit: z.enum(['None', '♠', '♦', '♥', '♣']),
+  })),
 });

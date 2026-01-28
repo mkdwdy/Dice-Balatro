@@ -2,54 +2,25 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
-  insertGameSessionSchema, 
   updateGameSessionSchema, 
   type Dice,
   type DeckDice,
-  type DiceFace,
   isDiceArray,
   isDeckDiceArray,
+  isJokerArray,
+  isConsumableArray,
+  isVoucherArray,
 } from "@shared/schema";
+import { getStageStats, createInitialDiceDeck } from "@shared/gameLogic";
 import { AppError } from "./middleware/errorHandler";
 import { asyncHandler } from "./middleware/asyncHandler";
 import {
   rollDiceSchema,
+  submitHandSchema,
+  nextStageSchema,
+  shopBuySchema,
+  syncDiceDeckSchema,
 } from "./validators/gameValidators";
-
-const FIXED_SUITS = ['None', '♠', '♦', '♥', '♣'];
-
-// 스테이지별 적 HP와 골드 보상 계산 (순차 진행 방식)
-function getStageStats(stage: number) {
-  const baseHp = 100;
-  const baseReward = 3;
-  const stageMultiplier = 1 + (stage - 1) * 0.5; // 스테이지마다 50% 증가
-  
-  return {
-    enemyHp: Math.round(baseHp * stageMultiplier),
-    goldReward: Math.round(baseReward * stageMultiplier),
-    enemyDamage: Math.round(10 + (stage - 1) * 2), // 스테이지마다 데미지 증가
-  };
-}
-
-// 초기 주사위 덱 생성 (각 주사위는 6면체)
-// currentTopFace는 클라이언트에서 실제 주사위 값이 결정된 후 동기화로 설정됨
-function createInitialDiceDeck(): DeckDice[] {
-  return Array.from({ length: 5 }, (_, i) => {
-    // 각 주사위의 6개 면 생성
-    const faces: DiceFace[] = Array.from({ length: 6 }, (_, faceIndex) => {
-      // 기본적으로 각 면은 1-6 값과 슈트
-      const value = faceIndex + 1; // 1, 2, 3, 4, 5, 6
-      const suit = FIXED_SUITS[i] as DiceFace['suit']; // 각 주사위는 기본 슈트를 가짐
-      return { value, suit };
-    });
-    
-    return {
-      id: i,
-      faces,
-      currentTopFace: 0, // 초기값은 0 (클라이언트에서 실제 값 결정 후 동기화로 업데이트됨)
-    };
-  });
-}
 
 // 주사위 값은 클라이언트에서 물리 시뮬레이션으로 결정되므로
 // 서버에서는 빈 배열로 시작 (클라이언트에서 첫 번째 굴리기 후 값이 설정됨)
@@ -90,33 +61,23 @@ export async function registerRoutes(
   }));
 
   // 게임 세션 불러오기
-  app.get('/api/games/:id', async (req, res) => {
-    try {
-      const session = await storage.getGameSession(req.params.id);
-      if (!session) {
-        return res.status(404).json({ error: 'Game session not found' });
-      }
-      res.json(session);
-    } catch (error) {
-      console.error('Error fetching game session:', error);
-      res.status(500).json({ error: 'Failed to fetch game session' });
+  app.get('/api/games/:id', asyncHandler(async (req, res) => {
+    const session = await storage.getGameSession(req.params.id);
+    if (!session) {
+      throw new AppError(404, 'Game session not found', 'SESSION_NOT_FOUND');
     }
-  });
+    res.json(session);
+  }));
 
   // 게임 상태 업데이트
-  app.put('/api/games/:id', async (req, res) => {
-    try {
-      const updates = updateGameSessionSchema.parse(req.body);
-      const session = await storage.updateGameSession(req.params.id, updates);
-      if (!session) {
-        return res.status(404).json({ error: 'Game session not found' });
-      }
-      res.json(session);
-    } catch (error) {
-      console.error('Error updating game session:', error);
-      res.status(500).json({ error: 'Failed to update game session' });
+  app.put('/api/games/:id', asyncHandler(async (req, res) => {
+    const updates = updateGameSessionSchema.parse(req.body);
+    const session = await storage.updateGameSession(req.params.id, updates);
+    if (!session) {
+      throw new AppError(404, 'Game session not found', 'SESSION_NOT_FOUND');
     }
-  });
+    res.json(session);
+  }));
 
   // 주사위 굴리기 (락된 주사위만 서버에 저장, 나머지는 물리 시뮬레이션)
   app.post('/api/games/:id/roll', asyncHandler(async (req, res) => {
@@ -182,151 +143,249 @@ export async function registerRoutes(
     res.json(updatedSession);
   }));
 
-  // 핸드 제출 (데미지 계산)
-  app.post('/api/games/:id/submit', async (req, res) => {
-    try {
-      const { damage } = req.body;
-      const session = await storage.getGameSession(req.params.id);
-      if (!session) {
-        return res.status(404).json({ error: 'Game session not found' });
-      }
-
-      const newEnemyHp = Math.max(0, session.enemyHp - damage);
-      const enemyDamage = session.enemyDamage || 10;
-      const newPlayerHp = Math.max(0, session.health - enemyDamage);
-      
-      // 새로운 라운드 시작: 덱은 유지하고 currentTopFace만 초기화 (클라이언트에서 동기화로 업데이트됨)
-      const currentDeck = isDeckDiceArray(session.diceDeck) ? session.diceDeck : [];
-      const newDeck = currentDeck.length > 0 
-        ? currentDeck.map(d => ({ ...d, currentTopFace: 0 })) // 초기화만 (클라이언트에서 동기화로 업데이트됨)
-        : createInitialDiceDeck();
-      // 주사위 값은 클라이언트에서 물리 시뮬레이션으로 결정되므로 빈 배열로 시작
-      const newDices: Dice[] = [];
-      
-      let newGameState = 'combat';
-      let goldReward = 0;
-      
-      if (newPlayerHp === 0) {
-        newGameState = 'game_over';
-      } else if (newEnemyHp === 0) {
-        newGameState = 'shop';
-        goldReward = session.pendingGoldReward || 0;
-      }
-
-      const updatedSession = await storage.updateGameSession(req.params.id, {
-        enemyHp: newEnemyHp,
-        health: newPlayerHp,
-        gold: session.gold + goldReward,
-        score: session.score + damage,
-        dices: newDices,
-        diceDeck: newDeck,
-        rerollsLeft: 3,
-        gameState: newGameState,
-        pendingGoldReward: 0,
-      });
-
-      res.json(updatedSession);
-    } catch (error) {
-      console.error('Error submitting hand:', error);
-      res.status(500).json({ error: 'Failed to submit hand' });
+  // 핸드 제출 (데미지 계산) - 순차 발동 시스템 적용
+  app.post('/api/games/:id/submit', asyncHandler(async (req, res) => {
+    const validatedBody = submitHandSchema.parse(req.body);
+    // 항상 최신 세션을 가져옴 (여러 번 공격 시 중요)
+    const session = await storage.getGameSession(req.params.id);
+    if (!session) {
+      throw new AppError(404, 'Game session not found', 'SESSION_NOT_FOUND');
     }
-  });
+    
+    // 디버깅: 세션 상태 확인
+    console.log(`[SERVER DEBUG] Submit - Current gold: ${session.gold}, Pending reward: ${session.pendingGoldReward}, Enemy HP: ${session.enemyHp}`);
+
+    // 순차 발동 시스템으로 데미지 계산
+    const { activateDicesSequentially } = await import('@shared/diceActivation');
+    const { getActiveDicesForHand } = await import('@shared/gameLogic');
+    const { isJokerArray } = await import('@shared/schema');
+    
+    const jokers = isJokerArray(session.jokers) ? session.jokers : [];
+    const handUpgrades = (session.handUpgrades as Record<string, number>) || {};
+    
+    // 족보 Multiplier 찾기
+    const HAND_TYPES = [
+      { name: 'Yahtzee', multiplier: 30 },
+      { name: 'Straight Flush', multiplier: 50 },
+      { name: 'Four of a Kind', multiplier: 5 },
+      { name: 'Full House', multiplier: 4 },
+      { name: 'Flush', multiplier: 10 },
+      { name: 'Straight 5', multiplier: 4 },
+      { name: 'Triple', multiplier: 3 },
+      { name: 'Two Pair', multiplier: 2 },
+      { name: 'Straight 4', multiplier: 2 },
+      { name: 'Pair', multiplier: 1 },
+      { name: 'Straight 3', multiplier: 1 },
+      { name: 'High Dice', multiplier: 0 },
+    ];
+    
+    const handType = HAND_TYPES.find(h => h.name === validatedBody.handName);
+    const handMultiplier = handType?.multiplier || 0;
+    const upgradeBonus = handUpgrades[validatedBody.handName] || 0;
+    const totalHandMultiplier = handMultiplier + upgradeBonus;
+    
+    // 발라트로 방식: 족보에 사용된 주사위만 발동
+    const activeDices = getActiveDicesForHand(validatedBody.handName, validatedBody.lockedDices);
+    
+    // 디버깅: 필터링 결과 확인
+    console.log(`[SERVER DEBUG] Hand: ${validatedBody.handName}`);
+    console.log(`[SERVER DEBUG] Total locked dice: ${validatedBody.lockedDices.length}`);
+    console.log(`[SERVER DEBUG] Locked dice values: ${validatedBody.lockedDices.map(d => `${d.id}:${d.value}`).join(', ')}`);
+    console.log(`[SERVER DEBUG] Active dice (after filtering): ${activeDices.length}`);
+    console.log(`[SERVER DEBUG] Active dice IDs: ${activeDices.map(d => d.id).join(', ')}`);
+    console.log(`[SERVER DEBUG] Active dice values: ${activeDices.map(d => `${d.id}:${d.value}`).join(', ')}`);
+    
+    if (activeDices.length === 0) {
+      console.error(`[SERVER ERROR] No active dice found for hand: ${validatedBody.handName}`);
+    }
+    
+    // 순차 발동 실행 (족보에 사용된 주사위만)
+    const activationResult = activateDicesSequentially(
+      activeDices,
+      jokers,
+      totalHandMultiplier,
+      handUpgrades,
+      validatedBody.handName // 족보 이름 전달
+    );
+    
+    // 디버깅: 발동 결과 확인
+    console.log(`[SERVER DEBUG] Activation result count: ${activationResult.activations.length}`);
+    console.log(`[SERVER DEBUG] Activation result dice IDs: ${activationResult.activations.map(a => a.dice.id).join(', ')}`);
+    
+    const damage = Math.round(activationResult.finalDamage);
+
+    const newEnemyHp = Math.max(0, session.enemyHp - damage);
+    const enemyDamage = session.enemyDamage || 10;
+    const newPlayerHp = Math.max(0, session.health - enemyDamage);
+    
+    // 새로운 라운드 시작: 덱은 유지하고 currentTopFace만 초기화 (클라이언트에서 동기화로 업데이트됨)
+    const currentDeck = isDeckDiceArray(session.diceDeck) ? session.diceDeck : [];
+    const newDeck = currentDeck.length > 0 
+      ? currentDeck.map(d => ({ ...d, currentTopFace: 0 })) // 초기화만 (클라이언트에서 동기화로 업데이트됨)
+      : createInitialDiceDeck();
+    // 주사위 값은 클라이언트에서 물리 시뮬레이션으로 결정되므로 빈 배열로 시작
+    const newDices: Dice[] = [];
+    
+    let newGameState = 'combat';
+    let goldReward = 0;
+    
+    if (newPlayerHp === 0) {
+      newGameState = 'game_over';
+    } else if (newEnemyHp === 0) {
+      newGameState = 'shop';
+      goldReward = session.pendingGoldReward || 0;
+      console.log(`[SERVER DEBUG] Enemy defeated!`);
+      console.log(`[SERVER DEBUG] Pending gold reward: ${session.pendingGoldReward}`);
+      console.log(`[SERVER DEBUG] Current gold: ${session.gold}`);
+      console.log(`[SERVER DEBUG] Gold reward to add: ${goldReward}`);
+      console.log(`[SERVER DEBUG] New gold will be: ${session.gold + goldReward}`);
+    }
+
+    const updatedSession = await storage.updateGameSession(req.params.id, {
+      enemyHp: newEnemyHp,
+      health: newPlayerHp,
+      gold: session.gold + goldReward,
+      score: session.score + damage,
+      dices: newDices,
+      diceDeck: newDeck,
+      rerollsLeft: 3,
+      gameState: newGameState,
+      // 적이 처치되었을 때만 pendingGoldReward를 0으로 초기화
+      // 적이 처치되지 않았으면 기존 값을 유지
+      pendingGoldReward: newEnemyHp === 0 ? 0 : session.pendingGoldReward,
+    });
+    
+    // 골드 업데이트 확인
+    if (newEnemyHp === 0) {
+      console.log(`[SERVER DEBUG] Updated session gold: ${updatedSession?.gold}, Expected: ${session.gold + goldReward}`);
+    }
+
+    if (!updatedSession) {
+      throw new AppError(500, 'Failed to update game session', 'UPDATE_FAILED');
+    }
+
+    // 순차 발동 결과를 응답에 포함
+    res.json({
+      ...updatedSession,
+      activationResult: {
+        activations: activationResult.activations,
+        totalChips: activationResult.totalChips,
+        totalMultiplier: activationResult.totalMultiplier,
+        finalDamage: activationResult.finalDamage,
+      },
+    });
+  }));
 
   // 다음 스테이지로 이동
-  app.post('/api/games/:id/next-stage', async (req, res) => {
-    try {
-      const { stageChoice } = req.body; // 'easy', 'medium', 'hard', 'boss'
-      const session = await storage.getGameSession(req.params.id);
-      if (!session) {
-        return res.status(404).json({ error: 'Game session not found' });
-      }
-
-      // 다음 스테이지 번호 계산 (현재 스테이지 + 1)
-      const nextStage = session.currentStage + 1;
-      const stageStats = getStageStats(nextStage);
-
-      // 새로운 스테이지 시작: 덱은 유지하고 currentTopFace만 초기화
-      const currentDeck = isDeckDiceArray(session.diceDeck) ? session.diceDeck : [];
-      const newDeck = currentDeck.length > 0
-        ? currentDeck.map(d => ({ ...d, currentTopFace: 0 })) // 초기화만 (클라이언트에서 동기화로 업데이트됨)
-        : createInitialDiceDeck();
-      // 주사위 값은 클라이언트에서 물리 시뮬레이션으로 결정되므로 빈 배열로 시작
-      const newDices: Dice[] = [];
-
-      const updatedSession = await storage.updateGameSession(req.params.id, {
-        gameState: 'combat',
-        enemyHp: stageStats.enemyHp,
-        maxEnemyHp: stageStats.enemyHp,
-        enemyDamage: stageStats.enemyDamage,
-        pendingGoldReward: stageStats.goldReward,
-        currentStage: nextStage,
-        rerollsLeft: 3,
-        dices: newDices,
-        diceDeck: newDeck,
-      });
-
-      res.json(updatedSession);
-    } catch (error) {
-      console.error('Error moving to next stage:', error);
-      res.status(500).json({ error: 'Failed to move to next stage' });
+  app.post('/api/games/:id/next-stage', asyncHandler(async (req, res) => {
+    const validatedBody = nextStageSchema.parse(req.body);
+    const session = await storage.getGameSession(req.params.id);
+    if (!session) {
+      throw new AppError(404, 'Game session not found', 'SESSION_NOT_FOUND');
     }
-  });
+
+    // 다음 스테이지 번호 계산 (현재 스테이지 + 1)
+    const nextStage = session.currentStage + 1;
+    const stageStats = getStageStats(nextStage);
+
+    // 새로운 스테이지 시작: 덱은 유지하고 currentTopFace만 초기화
+    const currentDeck = isDeckDiceArray(session.diceDeck) ? session.diceDeck : [];
+    const newDeck = currentDeck.length > 0
+      ? currentDeck.map(d => ({ ...d, currentTopFace: 0 })) // 초기화만 (클라이언트에서 동기화로 업데이트됨)
+      : createInitialDiceDeck();
+    // 주사위 값은 클라이언트에서 물리 시뮬레이션으로 결정되므로 빈 배열로 시작
+    const newDices: Dice[] = [];
+
+    const updatedSession = await storage.updateGameSession(req.params.id, {
+      gameState: 'combat',
+      enemyHp: stageStats.enemyHp,
+      maxEnemyHp: stageStats.enemyHp,
+      enemyDamage: stageStats.enemyDamage,
+      pendingGoldReward: stageStats.goldReward,
+      currentStage: nextStage,
+      rerollsLeft: 3,
+      dices: newDices,
+      diceDeck: newDeck,
+    });
+
+    if (!updatedSession) {
+      throw new AppError(500, 'Failed to update game session', 'UPDATE_FAILED');
+    }
+
+    res.json(updatedSession);
+  }));
 
   // 상점에서 아이템 구매
-  app.post('/api/games/:id/shop/buy', async (req, res) => {
-    try {
-      const { itemType, item, cost } = req.body; // itemType: 'joker', 'consumable', 'voucher'
-      const session = await storage.getGameSession(req.params.id);
-      if (!session) {
-        return res.status(404).json({ error: 'Game session not found' });
-      }
-
-      if (session.gold < cost) {
-        return res.status(400).json({ error: 'Not enough gold' });
-      }
-
-      const updates: any = {
-        gold: session.gold - cost,
-      };
-
-      if (itemType === 'joker') {
-        updates.jokers = [...(session.jokers as any[]), item];
-      } else if (itemType === 'consumable') {
-        updates.consumables = [...(session.consumables as any[]), item];
-      } else if (itemType === 'voucher') {
-        updates.vouchers = [...(session.vouchers as any[]), item];
-      }
-
-      const updatedSession = await storage.updateGameSession(req.params.id, updates);
-      res.json(updatedSession);
-    } catch (error) {
-      console.error('Error buying item:', error);
-      res.status(500).json({ error: 'Failed to buy item' });
+  app.post('/api/games/:id/shop/buy', asyncHandler(async (req, res) => {
+    const validatedBody = shopBuySchema.parse(req.body);
+    const session = await storage.getGameSession(req.params.id);
+    if (!session) {
+      throw new AppError(404, 'Game session not found', 'SESSION_NOT_FOUND');
     }
-  });
+
+    if (session.gold < validatedBody.cost) {
+      throw new AppError(400, 'Not enough gold', 'INSUFFICIENT_GOLD');
+    }
+
+    const currentJokers = isJokerArray(session.jokers) ? session.jokers : [];
+    const currentConsumables = isConsumableArray(session.consumables) ? session.consumables : [];
+    const currentVouchers = isVoucherArray(session.vouchers) ? session.vouchers : [];
+
+    let goldChange = -validatedBody.cost;
+    
+    // 골드 코인 구매 시 골드 증가
+    if (validatedBody.itemType === 'consumable' && validatedBody.item.effect === 'gold') {
+      // 골드 코인: $2 구매 시 $5 획득 (순수익 +$3)
+      // 하지만 실제로는 $5를 획득하므로, cost를 차감한 후 $5를 추가
+      goldChange = -validatedBody.cost + 5;
+    }
+
+    const updates: {
+      gold: number;
+      jokers?: typeof currentJokers;
+      consumables?: typeof currentConsumables;
+      vouchers?: typeof currentVouchers;
+    } = {
+      gold: session.gold + goldChange,
+    };
+
+    if (validatedBody.itemType === 'joker') {
+      updates.jokers = [...currentJokers, validatedBody.item];
+    } else if (validatedBody.itemType === 'consumable') {
+      updates.consumables = [...currentConsumables, validatedBody.item];
+    } else if (validatedBody.itemType === 'voucher') {
+      updates.vouchers = [...currentVouchers, validatedBody.item];
+    }
+
+    const updatedSession = await storage.updateGameSession(req.params.id, updates);
+    if (!updatedSession) {
+      throw new AppError(500, 'Failed to update game session', 'UPDATE_FAILED');
+    }
+
+    res.json(updatedSession);
+  }));
 
   // 상점 나가기
-  app.post('/api/games/:id/shop/exit', async (req, res) => {
-    try {
-      const session = await storage.getGameSession(req.params.id);
-      if (!session) {
-        return res.status(404).json({ error: 'Game session not found' });
-      }
-
-      const updatedSession = await storage.updateGameSession(req.params.id, {
-        gameState: 'stage_select',
-      });
-
-      res.json(updatedSession);
-    } catch (error) {
-      console.error('Error exiting shop:', error);
-      res.status(500).json({ error: 'Failed to exit shop' });
+  app.post('/api/games/:id/shop/exit', asyncHandler(async (req, res) => {
+    const session = await storage.getGameSession(req.params.id);
+    if (!session) {
+      throw new AppError(404, 'Game session not found', 'SESSION_NOT_FOUND');
     }
-  });
+
+    const updatedSession = await storage.updateGameSession(req.params.id, {
+      gameState: 'stage_select',
+    });
+
+    if (!updatedSession) {
+      throw new AppError(500, 'Failed to update game session', 'UPDATE_FAILED');
+    }
+
+    res.json(updatedSession);
+  }));
 
   // 주사위 덱의 currentTopFace를 실제 값에 맞춰 업데이트
   app.post('/api/games/:id/sync-dice-deck', asyncHandler(async (req, res) => {
-    const { dices } = req.body; // { id: number, value: number, suit: string }[]
+    const validatedBody = syncDiceDeckSchema.parse(req.body);
     const session = await storage.getGameSession(req.params.id);
     
     if (!session) {
@@ -341,7 +400,7 @@ export async function registerRoutes(
 
     // 각 주사위의 실제 값과 슈트에 맞는 면을 찾아서 currentTopFace 업데이트
     const updatedDeck = currentDeck.map(deckDice => {
-      const clientDice = dices.find((d: any) => d.id === deckDice.id);
+      const clientDice = validatedBody.dices.find((d) => d.id === deckDice.id);
       
       if (!clientDice) {
         return deckDice; // 클라이언트에서 값이 없으면 그대로 유지

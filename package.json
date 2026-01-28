@@ -6,6 +6,9 @@
   "scripts": {
     "dev:client": "vite dev --port 5000",
     "dev": "NODE_ENV=development tsx server/index.ts",
+    "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev-server.ps1",
+    "dev:check": "powershell -ExecutionPolicy Bypass -File scripts/check-server.ps1",
+    "dev:verify": "powershell -ExecutionPolicy Bypass -File scripts/verify-test-checklist.ps1",
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
@@ -15,7 +18,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run __e2e__",
-    "test:integration": "vitest run __integration__"
+    "test:integration": "vitest run __integration__",
+    "test:server": "npm run dev:check",
+    "test:checklist": "npm run dev:verify"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -92,6 +92,9 @@ interface DiceProps {
   rolling: boolean;
   power: number;
   onValueSettled?: (id: number, value: number) => void;
+  isActivating?: boolean;
+  activationOrder?: number;
+  jokerEffects?: Array<{ jokerName: string; chipsBonus: number; multBonus: number }>;
 }
 
 const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
@@ -103,11 +106,13 @@ const VALUE_TO_ROTATION: Record<number, [number, number, number]> = {
   6: [Math.PI / 2, 0, 0],
 };
 
-function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power, onValueSettled }: DiceProps) {
+function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, power, onValueSettled, isActivating = false, activationOrder = 0, jokerEffects = [] }: DiceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const wasRollingRef = useRef(false);
   const settledFramesRef = useRef(0);
   const hasReportedValueRef = useRef(false);
+  const activationStartTimeRef = useRef<number>(0);
+  const activationProgressRef = useRef<number>(0);
   
   const initialRotation: [number, number, number] = VALUE_TO_ROTATION[value] || [0, 0, 0];
   
@@ -148,13 +153,20 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
   }, [suit]);
 
   const materials = useMemo(() => {
+    // 발동 중일 때 밝은 색상 적용
+    const baseColor = isActivating ? '#ffff88' : (isLocked ? '#ffff00' : '#ffffff');
+    const emissiveColor = isActivating ? '#ffff44' : '#000000';
+    const emissiveIntensity = isActivating ? 0.5 : 0;
+    
     return textures.map(texture => 
       new THREE.MeshStandardMaterial({ 
         map: texture, 
-        color: isLocked ? '#ffff00' : '#ffffff' 
+        color: baseColor,
+        emissive: emissiveColor,
+        emissiveIntensity: emissiveIntensity
       })
     );
-  }, [textures, isLocked]);
+  }, [textures, isLocked, isActivating]);
 
 
   useEffect(() => {
@@ -184,7 +196,48 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
     }
   }, [rolling, isLocked, api, power]);
 
-  useFrame(() => {
+  // 발동 애니메이션 시작
+  useEffect(() => {
+    if (isActivating) {
+      activationStartTimeRef.current = Date.now();
+      activationProgressRef.current = 0;
+    } else {
+      activationProgressRef.current = 0;
+    }
+  }, [isActivating]);
+
+  useFrame((state, delta) => {
+    const mesh = meshRef.current;
+    
+    // 발동 애니메이션 처리
+    if (isActivating && mesh) {
+      const elapsed = Date.now() - activationStartTimeRef.current;
+      const duration = 600; // 애니메이션 지속 시간 (ms)
+      const progress = Math.min(elapsed / duration, 1);
+      activationProgressRef.current = progress;
+      
+      // 펄스 효과 (크기 변화)
+      const pulseScale = 1 + Math.sin(progress * Math.PI * 4) * 0.15;
+      mesh.scale.setScalar(pulseScale);
+      
+      // 상승 효과
+      const baseY = position[1];
+      const liftHeight = 2;
+      const liftProgress = Math.sin(progress * Math.PI);
+      const currentY = baseY + liftHeight * liftProgress;
+      
+      // 회전 효과
+      const rotationSpeed = 2;
+      mesh.rotation.y += delta * rotationSpeed;
+      
+      // 물리 위치 업데이트
+      const [x, _, z] = position;
+      api.position.set(x, currentY, z);
+    } else if (mesh && !isActivating) {
+      // 발동이 끝나면 원래 크기로 복귀
+      mesh.scale.setScalar(1);
+    }
+    
     if (isLocked) {
       api.velocity.set(0, 0, 0);
       api.angularVelocity.set(0, 0, 0);
@@ -200,7 +253,6 @@ function Dice({ id, position, value, suit, isLocked, onLockToggle, rolling, powe
       if (speed < 0.1 && angSpeed < 0.1) {
         settledFramesRef.current++;
         if (settledFramesRef.current > 10) {
-          const mesh = meshRef.current;
           if (mesh && onValueSettled) {
             const topValue = getTopFaceValue(mesh);
             onValueSettled(id, topValue);
@@ -362,9 +414,12 @@ interface DiceBoardProps {
   rolling: boolean;
   power?: number;
   onValueSettled?: (id: number, value: number) => void;
+  activatingDiceId?: number | null;
+  activationOrder?: number;
+  activationResults?: Array<{ dice: { id: number }; jokerEffects: Array<{ jokerName: string; chipsBonus: number; multBonus: number }> }>;
 }
 
-function DiceScene({ dices, onLockToggle, rolling, power = 1, onValueSettled }: DiceBoardProps) {
+function DiceScene({ dices, onLockToggle, rolling, power = 1, onValueSettled, activatingDiceId = null, activationOrder = 0, activationResults = [] }: DiceBoardProps) {
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 25, 1]} fov={35} onUpdate={c => c.lookAt(0, 0, 0)} />
@@ -391,26 +446,41 @@ function DiceScene({ dices, onLockToggle, rolling, power = 1, onValueSettled }: 
         <Plane />
         <DynamicWalls />
 
-        {dices.map((dice, i) => (
-          <Dice
-            key={dice.id}
-            id={dice.id}
-            position={[(i - 2) * 2.5, 6 + i, 0]} 
-            value={dice.value}
-            suit={dice.suit}
-            isLocked={dice.locked}
-            onLockToggle={onLockToggle}
-            rolling={rolling}
-            power={power}
-            onValueSettled={onValueSettled}
-          />
-        ))}
+        {dices.map((dice, i) => {
+          const activation = activationResults.find(a => a.dice.id === dice.id);
+          const isActivating = activatingDiceId === dice.id;
+          const order = isActivating ? activationOrder : 0;
+          const jokerEffects = activation?.jokerEffects || [];
+          
+          // 디버깅: 발동되는 주사위 확인
+          if (isActivating) {
+            console.log(`[DICE3D DEBUG] Activating dice ID: ${dice.id}, Value: ${dice.value}, Activation found: ${!!activation}`);
+          }
+          
+          return (
+            <Dice
+              key={dice.id}
+              id={dice.id}
+              position={[(i - 2) * 2.5, 6 + i, 0]} 
+              value={dice.value}
+              suit={dice.suit}
+              isLocked={dice.locked}
+              onLockToggle={onLockToggle}
+              rolling={rolling}
+              power={power}
+              onValueSettled={onValueSettled}
+              isActivating={isActivating}
+              activationOrder={order}
+              jokerEffects={jokerEffects}
+            />
+          );
+        })}
       </Physics>
     </>
   );
 }
 
-export default function DiceBoard({ dices, onLockToggle, rolling, power = 1, onValueSettled }: DiceBoardProps) {
+export default function DiceBoard({ dices, onLockToggle, rolling, power = 1, onValueSettled, activatingDiceId, activationOrder, activationResults }: DiceBoardProps) {
   return (
     <div className="w-full h-full rounded-xl overflow-hidden border-2 border-border shadow-inner bg-black/80 relative">
       <Canvas shadows dpr={[1, 2]}>
@@ -420,6 +490,9 @@ export default function DiceBoard({ dices, onLockToggle, rolling, power = 1, onV
           rolling={rolling} 
           power={power}
           onValueSettled={onValueSettled}
+          activatingDiceId={activatingDiceId}
+          activationOrder={activationOrder}
+          activationResults={activationResults}
         />
       </Canvas>
       
